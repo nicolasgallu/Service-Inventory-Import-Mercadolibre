@@ -1,0 +1,4 @@
+.env
+venv-import-meli-inv/
+service_account.json
+test.ipynb
