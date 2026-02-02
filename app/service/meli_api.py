@@ -130,7 +130,7 @@ def item_reactivate(meli_id, token):
         else:
             logger.error(f"Failed to re-activate item {meli_id}: {response.text}")
             message = f"""Fallo en la etapa de reactivar el item: {meli_id} en Mercadolibre.
-                        la respuesta fue {response.text}"""
+                        la respuesta fue\n {response.text}"""
             enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, message)
             return False
     return True
@@ -241,8 +241,8 @@ def publish_item(item_data, brand, description, public_images, token):
         
         else:
             logger.error(f"Failed to create item {response.status_code} / {response.json()}")
-            message = f"""Fallo la actualizacion del item {item_data['id']} en Mercadolibre.
-                    la respuesta fue {response.json()}"""
+            message = f"""Fallo la publicacion del item {item_data['id']} en Mercadolibre.
+                    la respuesta fue\n {response.json()}"""
             enviar_mensaje_whapi(TOKEN_WHAPI,PHONES,message)
             return None
 
@@ -277,7 +277,7 @@ def update_item(item_data, description, public_images, token):
     else:
         logger.error(f"Failed to update item: {meli_id} / {response.json()}")
         message = f"""Fallo la actualizacion del item {item_data["id"]} en Mercadolibre.
-                    la respuesta fue {response.json()}"""
+                    la respuesta fue\n {response.json()}"""
         enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, message)
         return None
         
@@ -300,11 +300,11 @@ def pause_item(item_data, token):
             logger.info(f"Item {meli_id} successfully paused (status: paused).")
             return True
         else:
-            logger.error(f"Failed to pause item {meli_id}. Status: {response.status_code}, Error: {response.json()}")
+            logger.error(f"Failed to pause item {meli_id}. Status: {response.status_code}, Error:\n {response.json()}")
             enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, response.json())
             return False
 
     except Exception as error:
-        logger.error(f"Unexpected error while pausing {meli_id}: {str(error)}")
+        logger.error(f"Unexpected error while pausing {meli_id}:\n {str(error)}")
         enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, error)
         return False
