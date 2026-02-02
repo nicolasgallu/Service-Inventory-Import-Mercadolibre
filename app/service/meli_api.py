@@ -224,6 +224,7 @@ def publish_item(item_data, brand, description, public_images, token):
 
         response = requests.post("https://api.deepseek.com/v1/chat/completions", headers=headers, json=payload)
         item_data_fix = response.json()['choices'][0]['message']['content']
+        print(item_data_fix)
         item_data_fix=  ast.literal_eval(item_data_fix)
 
         #Trying to publish the item now with AI correction.
