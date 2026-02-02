@@ -37,7 +37,7 @@ def process_notification(response):
             brand = item_data['brand']
             
             if public_images == []:
-                public_images = [item_data["product_image_b_format_url"]]
+                public_images = {'source':item_data["product_image_b_format_url"]}
 
             token = meli_secrets()
 

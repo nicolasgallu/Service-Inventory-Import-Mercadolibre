@@ -4,7 +4,7 @@ url = "https://import-gestion-inventario-402745694567.us-central1.run.app/webhoo
 
 data = {
     "event_type":"publish",
-    "item_id": 77459,
+    "item_id": 77464,
     "secret":"mati-gordo"}
 
 #data = {
