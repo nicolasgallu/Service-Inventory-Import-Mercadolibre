@@ -32,6 +32,10 @@ WARRANTY_TYPE=os.getenv("WARRANTY_TYPE")
 WARRANTY_TIME=os.getenv("WARRANTY_TIME")
 
 
+ID_CARPETA_MADRE=os.getenv("ID_CARPETA_MADRE")
+BUCKET_NAME=os.getenv("BUCKET_NAME")
+
+
 #PROMPTS FOR CREATING EMPTY FIELDS
 PROMPT_SYS_DESCR = """
 Tu tarea es crear una descripción de producto para una página web, 

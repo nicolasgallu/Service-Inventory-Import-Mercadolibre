@@ -1,26 +1,37 @@
 import io
-from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 from google.cloud import storage
-from google.oauth2 import service_account
+import google.auth
+from googleapiclient.discovery import build
 from app.utils.logger import logger
-
-# === CONFIGURACIÓN ===
-SERVICE_ACCOUNT_FILE = 'service_account.json'
-ID_CARPETA_MADRE = '1dd2P6OkaFgvkah-sBr_sjagAnCk31n-v'
-BUCKET_NAME = 'bucket_import_fotos'
+from app.settings.config import ID_CARPETA_MADRE, BUCKET_NAME
 
 
 def get_services():
-    """Inicializa los servicios de Drive y Storage."""
-    creds = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE)
-    
-    drive_service = build('drive', 'v3', credentials=creds)
-    storage_client = storage.Client(credentials=creds)
-    bucket_client = storage_client.bucket(BUCKET_NAME)
-    
-    return drive_service, bucket_client
+    """
+    Inicializa los servicios de Drive y Storage usando Application Default Credentials (ADC).
+    En GCP, esto toma automáticamente los permisos de la Service Account asociada.
+    """
+    try:
+        # 1. Obtener credenciales predeterminadas del entorno (ADC)
+        # Esto reemplaza service_account.Credentials.from_service_account_file
+        creds, project = google.auth.default(
+            scopes=['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/cloud-platform']
+        )
+        
+        # 2. Inicializar Drive Service (API de Google Drive)
+        drive_service = build('drive', 'v3', credentials=creds)
+        
+        # 3. Inicializar Storage Client (API de Google Cloud Storage)
+        # Al correr en GCP, no hace falta pasar creds explícitamente si usas el cliente nativo
+        storage_client = storage.Client(credentials=creds)
+        bucket_client = storage_client.bucket(BUCKET_NAME)
+        
+        return drive_service, bucket_client
 
+    except Exception as e:
+        logger.error(f"Error al inicializar servicios de GCP: {e}")
+        raise
 
 def process_images_storage(item_id):
     """
