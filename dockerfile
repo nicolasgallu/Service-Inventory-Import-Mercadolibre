@@ -24,4 +24,4 @@ EXPOSE 8080
 
 # Comando de inicio: Usar el formato SHELL para que $PORT se expanda.
 # Importante: Se eliminan --reload y watchdog, ya que no son para producción.
-CMD ["python", "-m", "gunicorn", "--bind", "0.0.0.0:8080", "--chdir", "/app", "--timeout", "60", "main:app"]
+CMD ["python", "-m", "gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "8", "--timeout", "300", "main:app"]
