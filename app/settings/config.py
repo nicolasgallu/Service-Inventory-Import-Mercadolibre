@@ -7,15 +7,19 @@ SECRET_ID=os.getenv("SECRET_ID")
 
 SECRET_GUIAS=os.getenv("SECRET_GUIAS")
 
+
 DS_API_KEY=os.getenv("DS_API_KEY")
+
 
 INSTANCE_DB=os.getenv("INSTANCE_DB")
 USER_DB=os.getenv("USER_DB")
 PASSWORD_DB=os.getenv("PASSWORD_DB")
 NAME_DB=os.getenv("NAME_DB")
 
+
 TOKEN_WHAPI=os.getenv("TOKEN_WHAPI")
 PHONES=os.getenv("PHONES")
+
 
 CURRENCY=os.getenv("CURRENCY")
 BUY_MODE=os.getenv("BUY_MODE")
@@ -27,54 +31,54 @@ FREE_SHIPPING=os.getenv("FREE_SHIPPING")
 WARRANTY_TYPE=os.getenv("WARRANTY_TYPE")
 WARRANTY_TIME=os.getenv("WARRANTY_TIME")
 
+
 #PROMPTS FOR CREATING EMPTY FIELDS
 PROMPT_SYS_DESCR = """
-        Tu tarea es crear una descripción de producto para una página web, 
-        basándote ESTRICTA Y ÚNICAMENTE en el nombre del producto que voy a compartirte.
-        Reglas importantes:
-        1.  *No inventes información:* No menciones materiales (plástico, madera, etc.), dimensiones (cm, pulgadas), 
-          colores, origen o detalles de fabricación a menos que estén escritos textualmente en el nombre del producto.
-        2.  *Mantén un tono formal y descriptivo:* Evita el lenguaje de marketing exagerado y los emojis.
-        3.  *Sé genérico si la información es limitada:* Si el nombre es simple, la descripción también debe serlo. 
-        El objetivo es describir el producto sin crear falsas expectativas."""
+Tu tarea es crear una descripción de producto para una página web, 
+basándote ESTRICTA Y ÚNICAMENTE en el nombre del producto que voy a compartirte.
+Reglas importantes:
+1.  *No inventes información:* No menciones materiales (plástico, madera, etc.), dimensiones (cm, pulgadas), 
+  colores, origen o detalles de fabricación a menos que estén escritos textualmente en el nombre del producto.
+2.  *Mantén un tono formal y descriptivo:* Evita el lenguaje de marketing exagerado y los emojis.
+3.  *Sé genérico si la información es limitada:* Si el nombre es simple, la descripción también debe serlo. 
+El objetivo es describir el producto sin crear falsas expectativas."""
 
 PROMPT_SYS_BRAND = """
-            Tu tarea es identificar la MARCA de un producto basándote en su nombre comercial. 
-            Reglas estrictas:
-            1. Extrae el nombre del fabricante o marca comercial presente en el texto.
-            2. Si el nombre del producto NO contiene una marca explícita, pero el modelo es universalmente reconocido 
-            (ej. 'iPhone 13' -> Apple), devuelve la marca correspondiente.
-            3. Si el producto es genérico o no hay ninguna pista sobre el fabricante, responde ÚNICAMENTE con la palabra: 'Genérico'.
-            4. No añadas explicaciones, adjetivos ni texto adicional. Solo el nombre de la marca.
-            5. Si detectas varias marcas (ej. una colaboración), menciona ambas separadas por una coma."""
+Tu tarea es identificar la MARCA de un producto basándote en su nombre comercial. 
+Reglas estrictas:
+1. Extrae el nombre del fabricante o marca comercial presente en el texto.
+2. Si el nombre del producto NO contiene una marca explícita, pero el modelo es universalmente reconocido 
+(ej. 'iPhone 13' -> Apple), devuelve la marca correspondiente.
+3. Si el producto es genérico o no hay ninguna pista sobre el fabricante, responde ÚNICAMENTE con la palabra: 'Genérico'.
+4. No añadas explicaciones, adjetivos ni texto adicional. Solo el nombre de la marca.
+5. Si detectas varias marcas (ej. una colaboración), menciona ambas separadas por una coma."""
 
 
 #PROMPTS FOR AI HELPER (second try to publish item in Meli)
 PROMPT_SYS_MELI = """
-           Actúa como un Desarrollador Senior especializado en integraciones con la API de Mercado Libre Argentina. 
-           Tu objetivo es corregir diccionarios de publicación (Payloads) basándote en errores de validación devueltos por la API.
-           Recibirás dos entradas:
-               ERROR_API: El JSON/Dict con el error de validación de Mercado Libre.
-               PAYLOAD_ORIGINAL: El diccionario de Python con los datos que intenté publicar.
-           Tu Tarea: Analiza el ERROR_API, identifica qué falta o qué está mal en el PAYLOAD_ORIGINAL y genera un NUEVO_PAYLOAD.
-           Reglas Inquebrantables:
-               Formato de Salida: Devuelve ÚNICAMENTE el diccionario de Python corregido. 
-               No incluyas explicaciones, ni bloques de código Markdown adicionales, solo el dict.
-           Modificaciones permitidas: 
-               Solo puedes agregar atributos faltantes (como IS_FACTORY_KIT), corregir valores vacíos 
-               que causaron error o ajustar la estructura de attributes.
-           PROHIBICIÓN ABSOLUTA: 
-               No puedes modificar bajo ninguna circunstancia las siguientes llaves o valores: 
-               title, price, pictures, currency_id (debe ser "ARS").
-               buying_mode ("buy_it_now"), condition ("new"), listing_type_id ("gold_special").
-               shipping: mode ("me2"), local_pick_up (True), free_shipping (False).
-               sale_terms o warranty: "Garantía del vendedor" / "30 días".
-           Lógica de Atributos y Dimensiones: 
-               1. Si el error indica que un atributo fue "dropped" por estar vacío, elimínalo o complétalo.
-               2. Si falta un atributo obligatorio (missing_required), agrégalo con un valor coherente.
-               3. NORMALIZACIÓN DE UNIDADES: Si el error es 'number_invalid_format' o indica que faltan 
-                  unidades en dimensiones (como LENGTH, WIDTH, HEIGHT, WEIGHT), debes convertir el 
-                  valor numérico en un string que incluya la unidad métrica (ej: de 15 a "15 cm").
-               4. Si la API rechaza un ID de atributo (ej: LONG) y sugiere uno nuevo (ej: LENGTH), 
-                  reemplaza el ID manteniendo la coherencia de los datos.
-           Respuesta técnica directa: solo el objeto dict, sin preámbulos"""
+Actúa como un Desarrollador Senior especializado en integraciones con la API de Mercado Libre Argentina. 
+Tu objetivo es corregir y completar Payloads de publicación basándote en errores de la API y metadatos de atributos requeridos.
+
+Recibirás tres entradas:
+    1. ERROR_API: El error de validación devuelto por MeLi.
+    2. PAYLOAD_ORIGINAL: El diccionario actual que incluye 'title', 'description' y 'attributes'.
+    3. REQUIRED_ATTRIBUTES: Lista de diccionarios con los atributos que la categoría exige (id, name, value_type).
+
+Tu Tarea:
+    - Analiza el ERROR_API para identificar fallos estructurales o datos rechazados.
+    - Revisa REQUIRED_ATTRIBUTES y busca sus valores dentro del 'title' y 'description' del PAYLOAD_ORIGINAL.
+    - Genera un NUEVO_PAYLOAD corrigiendo errores y autocompletando campos obligatorios.
+
+Reglas Inquebrantables:
+    - Formato de Salida: Devuelve ÚNICAMENTE el diccionario de Python corregido.
+    - No incluyas explicaciones, preámbulos, ni bloques de código Markdown (```python ... ```). Solo el objeto dict {}.
+    - Si un atributo es 'number', asegúrate de que el valor sea numérico o convertible. Si es 'list', usa valores coherentes con el producto.
+    - PROHIBICIÓN: No modifiques title, price, pictures, currency_id, buying_mode, condition, listing_type_id, shipping, ni sale_terms.
+    - EXCLUSIÓN MUTUA GTIN: Si el atributo 'GTIN' tiene un valor (donde se mapean códigos EAN/UPC), es OBLIGATORIO eliminar el atributo 'EMPTY_GTIN_REASON' del payload. Mercado Libre no permite ambos simultáneamente.
+
+Lógica de Autocompletado:
+    1. BRAND y MODEL: Extráelos prioritariamente del 'title'.
+    2. GTIN: Si el error pide GTIN/EAN, búscalo en el PAYLOAD_ORIGINAL o mapealo desde el campo de código de producto. Recuerda: el ID del atributo debe ser 'GTIN' aunque el valor sea un EAN.
+    3. Unidades (LENGTH, WIDTH, etc.): Convierte a string con unidad métrica (ej: "20 cm") si la API indica error de formato numérico.
+    4. Fallback: Si un atributo es obligatorio pero no está en el texto, usa "Genérico" (para strings) o 1 (para unidades) solo si es estrictamente necesario para publicar.
+"""

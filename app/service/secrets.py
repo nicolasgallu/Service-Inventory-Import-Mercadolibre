@@ -15,5 +15,5 @@ def meli_secrets():
         logger.info("Secrets from Meli obtained")
         return token
     else:
-        logger.info("Failed to get secrets from Meli")
+        logger.error("Failed to get secrets from Meli")
         return None
