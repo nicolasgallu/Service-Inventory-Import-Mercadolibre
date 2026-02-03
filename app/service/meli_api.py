@@ -153,6 +153,8 @@ def publish_item(item_data, public_images, token):
     category_id = get_category_id(item_data["product_name"], token)
     required_attrs = get_required_attributes(category_id, token)
 
+    logger.info("intentando crear item format")
+
     try:
         item_format = {
             "title": item_data["product_name"], 
@@ -184,9 +186,12 @@ def publish_item(item_data, public_images, token):
                 {"id": "WARRANTY_TIME", "value_name": WARRANTY_TIME},
             ]
         }
+        logger.info(f"item format creado: {item_format}")
     
     except Exception as error:
         return error
+    
+    logger.info("intentando mandar datos a meli")
 
     try:
         response = requests.post("https://api.mercadolibre.com/items", 
@@ -194,6 +199,7 @@ def publish_item(item_data, public_images, token):
                     headers={"Authorization": f"Bearer {token}"})
         
     except Exception as error:
+        logger.error(error)
         return error
     
     if response.status_code in [200, 201]:
