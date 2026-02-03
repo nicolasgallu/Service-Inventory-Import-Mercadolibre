@@ -146,7 +146,7 @@ def publish_item(item_data, public_images, token):
     """publish the item with a second try option"""
 
     if item_data['meli_id']:
-        logger.warning(f"Item: {item_data['id']} already exists in mercadolibre under this ID: {item_data['meli_id']}")
+        logger.warning(f"Item: {item_data['id']} already exists in mercadolibre under this ID: {item_data['meli_id']} nothing to do.")
         return
 
     brand, description = completing_fields(item_data)
@@ -167,7 +167,7 @@ def publish_item(item_data, public_images, token):
             "buying_mode": BUY_MODE, 
             "condition": CONDITION, 
             "listing_type_id": LISTING_TYPE,
-            "pictures": [public_images], 
+            "pictures": public_images, 
             "attributes": [
                 {"id": "EAN", "value_name": item_data["product_code"]}, 
                 {"id": "BRAND", "value_name": brand},
@@ -239,8 +239,7 @@ def publish_item(item_data, public_images, token):
 
         response = requests.post("https://api.deepseek.com/v1/chat/completions", headers=headers, json=payload)
         item_data_fix = response.json()['choices'][0]['message']['content']
-        logger.info(f"Data Generada por AI para publicar en Meli: {item_data_fix}")
-        
+
         #Trying to publish the item now with AI correction.
         item_data_fix=  ast.literal_eval(item_data_fix)
         response = requests.post("https://api.mercadolibre.com/items", 

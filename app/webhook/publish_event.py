@@ -22,7 +22,7 @@ def process_notification(response):
         logger.info(f"Background Processing Event: {event_type} for ID: {item_id}")
         token = meli_secrets()
 
-        if event_type == "paused":
+        if event_type == "pause":
             pause_item(item_data, token)
 
         elif event_type in ["publish", "update"]:
@@ -30,8 +30,7 @@ def process_notification(response):
             public_images = process_images_storage(item_id)
             if public_images == []:
                 logger.info("Public Images in Drive not founded, using image from Bitcram..")
-                public_images = {'source': item_data["product_image_b_format_url"]}
-            logger.info(f"Las images publicas a utilizar son: {public_images}")
+                public_images = [{'source': item_data["product_image_b_format_url"]}]
 
             if event_type == "publish":
                 publish_item(item_data, public_images, token)
