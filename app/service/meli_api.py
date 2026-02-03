@@ -159,7 +159,7 @@ def publish_item(item_data, public_images, token):
         item_format = {
             "title": item_data["product_name"], 
             "category_id": category_id, 
-            "price": item_data["price"], 
+            "price": float(item_data["price"]), 
             "currency_id": CURRENCY, 
             "available_quantity": item_data["stock"],
             "buying_mode": BUY_MODE, 
@@ -269,7 +269,7 @@ def publish_item(item_data, public_images, token):
 def update_item(item_data, public_images, token):
 
     meli_id = item_data['meli_id']
-    price = item_data['price'] 
+    price = float(item_data['price']) 
     stock = item_data['stock'] 
     description = item_data['description'] 
 
