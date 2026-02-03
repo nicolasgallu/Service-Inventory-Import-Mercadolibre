@@ -146,7 +146,7 @@ def publish_item(item_data, public_images, token):
     """publish the item with a second try option"""
 
     if item_data['meli_id']:
-        logger.warning(f"Item: {item_data['item_id']} already exists in mercadolibre under this ID: {item_data['meli_id']}")
+        logger.warning(f"Item: {item_data['id']} already exists in mercadolibre under this ID: {item_data['meli_id']}")
         return
 
     brand, description = completing_fields(item_data)
@@ -311,7 +311,7 @@ def pause_item(item_data, token):
     meli_id = item_data['meli_id'] 
 
     if meli_id is None:
-        logger.error(f"Item: {item_data['item_id']} doesnt exists in mercadolibre, nothing to pause.")
+        logger.error(f"Item: {item_data['id']} doesnt exists in mercadolibre, nothing to pause.")
         return
 
     logger.info(f"Attempting to pause item: {meli_id}")
