@@ -2,7 +2,6 @@ import threading # <--- Importante
 from app.service.secrets import meli_secrets
 from app.service.database import get_item_data
 from app.service.google_pictures import process_images_storage
-from app.service.ai_completation import completing_fields
 from app.service.meli_api import publish_item, update_item, pause_item
 from app.utils.logger import logger
 from app.settings.config import SECRET_GUIAS
@@ -17,44 +16,32 @@ def process_notification(response):
     en un hilo separado (background).
     """
     try:
-        # Aquí pegamos exactamente tu lógica original
         item_id = response['item_id']
         event_type = response['event_type']
+        item_data = get_item_data(item_id)
         logger.info(f"Background Processing Event: {event_type} for ID: {item_id}")
+        token = meli_secrets()
 
         if event_type == "paused":
-            token = meli_secrets()
-            item_data = get_item_data(item_id)
-            print(item_data)
             pause_item(item_data, token)
-            return # En hilos usamos return para finalizar la función, no la respuesta HTTP
 
-        if event_type in ["publish", "update"]:
-            item_data = get_item_data(item_id)
-            public_images = process_images_storage(item_id)
-            item_data['price'] = float(item_data['price'])
-            description = item_data['description']
-            brand = item_data['brand']
+        elif event_type in ["publish", "update"]:
             
+            public_images = process_images_storage(item_id)
             if public_images == []:
-                public_images = {'source':item_data["product_image_b_format_url"]}
-
-            token = meli_secrets()
+                logger.info("Public Images in Drive not founded, using image from Bitcram..")
+                public_images = {'source': item_data["product_image_b_format_url"]}
+            logger.info(f"Las images publicas a utilizar son: {public_images}")
 
             if event_type == "publish":
-                logger.info("publishing..")
-                if description is None or brand is None:
-                    logger.info("completing fields with AI..")
-                    brand, description = completing_fields(item_data)
-
-                publish_item(item_data, brand, description, public_images, token)
+                publish_item(item_data, public_images, token)
             
-            if event_type == "update":
-                logger.info("updating..")
-                update_item(item_data, description, public_images, token)
+            elif event_type == "update":
+                update_item(item_data, public_images, token)
 
     except Exception as error:
         logger.error(f"Error in background task: {str(error)}")
+
 
 @meli_publish.route("", methods=["POST"], strict_slashes=False)
 def main():

@@ -16,7 +16,7 @@ def completing_fields(item_data):
     logger.info("Starting autocompletation fields..")
 
     if description is None:
-        logger.info("Description needed to Autocomplete.")
+        logger.info("Description is empty.")
         prompt_usr_description = f"el nombre del producto del cual necesito la descripcion es este: {product_name}"
         prompts.append(
                     {"type":"description",
@@ -25,7 +25,7 @@ def completing_fields(item_data):
 
 
     if brand is None: 
-        logger.info("Brand needed to Autocomplete.")
+        logger.info("Brand is empty.")
         prompt_usr_brand = f"el nombre del producto del cual necesito la marca es este: {product_name}"
         prompts.append(
                     {"type":"brand",
@@ -39,9 +39,8 @@ def completing_fields(item_data):
     }
 
     
-
     for prompt in prompts:
-        logger.info(f"Autocompleting for: {prompt['type']}")
+        logger.info(f"Autocompleting field: {prompt['type']}")
         payload = {
             "model": "deepseek-chat",
             "messages": [
@@ -54,11 +53,11 @@ def completing_fields(item_data):
         response = requests.post("https://api.deepseek.com/v1/chat/completions", headers=headers, json=payload)
         if prompt['type'] == "description":
             description = response.json()['choices'][0]['message']['content']
-        else:
+        if prompt['type'] == "brand":
             brand = response.json()['choices'][0]['message']['content']
 
-    logger.info("Finishing autocompletation fields..")
+    logger.info("AI Autocompleted Fields Finished.")
 
-    load_item_metadata(item_id, {'description':description, 'brand':brand})
+    load_item_metadata(item_id, {'description':description, 'brand':brand}) #poco perfomance debido a que sobreescribo data.
 
     return brand ,description

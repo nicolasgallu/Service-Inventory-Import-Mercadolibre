@@ -26,7 +26,7 @@ engine = create_engine(
 def get_item_data(item_id):
     """"""
     with engine.begin() as conn:
-        logger.info(f"Extracting data of item: {item_id} from DB")
+        logger.info(f"Extracting data from item: {item_id}.")
         result = conn.execute(
             text(f"""
                 SELECT * FROM app_import.product_catalog_sync
@@ -45,7 +45,7 @@ def get_item_data(item_id):
 #LOGICA PARA ESCRIBIR DATOS DEL ITEM.
 def load_item_metadata(item_id, item_metadata):
     with engine.begin() as conn:
-        logger.info(f"Saving description & brand for item: {item_id} in DB")
+        logger.info(f"Saving description & brand for item: {item_id}.")
         conn.execute(
             text(f"""
                 UPDATE app_import.product_catalog_sync SET 
@@ -60,7 +60,7 @@ def load_item_metadata(item_id, item_metadata):
 #LOGICA PARA ESCRIBIR MELI ID
 def load_meli_id(item_id, meli_id):
     with engine.begin() as conn:
-        logger.info(f"Saving Meli ID from item: {item_id} in DB")
+        logger.info(f"Saving Meli ID for item: {item_id}.")
         conn.execute(
             text(f"""
                 UPDATE app_import.product_catalog_sync SET 
