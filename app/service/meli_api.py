@@ -145,6 +145,10 @@ def item_reactivate(meli_id, token):
 def publish_item(item_data, public_images, token):
     """publish the item with a second try option"""
 
+    if item_data['meli_id']:
+        logger.warning(f"Item: {item_data['item_id']} already exists in mercadolibre under this ID: {item_data['meli_id']}")
+        return
+
     brand, description = completing_fields(item_data)
 
     ####TRYING TO PUBLISH FIRST TIME####
@@ -266,6 +270,11 @@ def publish_item(item_data, public_images, token):
 def update_item(item_data, public_images, token):
 
     meli_id = item_data['meli_id']
+
+    if meli_id is None:
+        logger.error(f"Item: {item_data['item_id']} doesnt exists in mercadolibre, nothing to update.")
+        return
+
     price = float(item_data['price']) 
     stock = item_data['stock'] 
     description = item_data['description'] 
@@ -300,6 +309,10 @@ def update_item(item_data, public_images, token):
 def pause_item(item_data, token):
     """Changes item status to paused in Mercado Libre"""
     meli_id = item_data['meli_id'] 
+
+    if meli_id is None:
+        logger.error(f"Item: {item_data['item_id']} doesnt exists in mercadolibre, nothing to pause.")
+        return
 
     logger.info(f"Attempting to pause item: {meli_id}")
     
