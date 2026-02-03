@@ -153,36 +153,40 @@ def publish_item(item_data, public_images, token):
     category_id = get_category_id(item_data["product_name"], token)
     required_attrs = get_required_attributes(category_id, token)
 
-    item_format = {
-        "title": item_data["product_name"], 
-        "category_id": category_id, 
-        "price": item_data["price"], 
-        "currency_id": CURRENCY, 
-        "available_quantity": item_data["stock"],
-        "buying_mode": BUY_MODE, 
-        "condition": CONDITION, 
-        "listing_type_id": LISTING_TYPE,
-        "pictures": [public_images], 
-        "attributes": [
-            {"id": "EAN", "value_name": item_data["product_code"]}, 
-            {"id": "BRAND", "value_name": brand},
-            {"id": "MODEL", "value_name": None},
-            {"id": "VALUE_ADDED_TAX", "value_id": "48405909"},#48405909 es el 21% 55043032 excento y 48405907 es 0%
-            {"id": "IMPORT_DUTY", "value_id": "49553239"}, #49553239 es 0
-            {"id": "EMPTY_GTIN_REASON", "value_id": "17055160"},#Bitcram no tiene GTIN
-            {"id": "UNITS_PER_PACK", "value_name": "1"}
-            
-        ],
-        "shipping": {
-            "mode": MODE, 
-            "local_pick_up": LOCAL_PICK_UP,
-            "free_shipping": FREE_SHIPPING 
-        },
-        "sale_terms": [
-            {"id": "WARRANTY_TYPE", "value_name": WARRANTY_TYPE}, 
-            {"id": "WARRANTY_TIME", "value_name": WARRANTY_TIME},
-        ]
-    }
+    try:
+        item_format = {
+            "title": item_data["product_name"], 
+            "category_id": category_id, 
+            "price": item_data["price"], 
+            "currency_id": CURRENCY, 
+            "available_quantity": item_data["stock"],
+            "buying_mode": BUY_MODE, 
+            "condition": CONDITION, 
+            "listing_type_id": LISTING_TYPE,
+            "pictures": [public_images], 
+            "attributes": [
+                {"id": "EAN", "value_name": item_data["product_code"]}, 
+                {"id": "BRAND", "value_name": brand},
+                {"id": "MODEL", "value_name": None},
+                {"id": "VALUE_ADDED_TAX", "value_id": "48405909"},#48405909 es el 21% 55043032 excento y 48405907 es 0%
+                {"id": "IMPORT_DUTY", "value_id": "49553239"}, #49553239 es 0
+                {"id": "EMPTY_GTIN_REASON", "value_id": "17055160"},#Bitcram no tiene GTIN
+                {"id": "UNITS_PER_PACK", "value_name": "1"}
+
+            ],
+            "shipping": {
+                "mode": MODE, 
+                "local_pick_up": LOCAL_PICK_UP,
+                "free_shipping": FREE_SHIPPING 
+            },
+            "sale_terms": [
+                {"id": "WARRANTY_TYPE", "value_name": WARRANTY_TYPE}, 
+                {"id": "WARRANTY_TIME", "value_name": WARRANTY_TIME},
+            ]
+        }
+    
+    except Exception as error:
+        return error
 
     try:
         response = requests.post("https://api.mercadolibre.com/items", 
