@@ -67,7 +67,7 @@ def process_images_storage(item_id):
 
     if not results:
         logger.info(f"Folder: '{item_id}' is empty.")
-        return None
+        return []
 
     # Tomamos solo los últimos 5
     last_5_files = results[:5]
