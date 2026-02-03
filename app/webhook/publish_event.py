@@ -31,6 +31,9 @@ def process_notification(response):
             if public_images == []:
                 logger.info("Public Images in Drive not founded, using image from Bitcram..")
                 public_images = [{'source': item_data["product_image_b_format_url"]}]
+            
+            if item_data['product_name_meli']:
+                item_data['product_name'] = item_data['product_name_meli'] ##sobreescribo el valor en product name para no tener que sumar complejidad.
 
             if event_type == "publish":
                 publish_item(item_data, public_images, token)
