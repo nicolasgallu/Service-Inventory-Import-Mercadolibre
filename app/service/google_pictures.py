@@ -51,8 +51,8 @@ def process_images_storage(item_id):
     folders = drive_service.files().list(q=folder_query, fields="files(id)").execute().get('files', [])
 
     if not folders:
-        logger.error(f"Error: folder: '{item_id}' not found in parent folder.")
-        return None
+        logger.warning(f"Error: folder: '{item_id}' not found in parent folder.")
+        return []
     
     folder_id = folders[0]['id']
 
