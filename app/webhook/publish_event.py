@@ -35,6 +35,8 @@ def process_notification(response):
             if item_data['product_name_meli']:
                 item_data['product_name'] = item_data['product_name_meli'] ##sobreescribo el valor en product name para no tener que sumar complejidad.
 
+            logger.info(f"imagenes a usar: {public_images}")
+
             if event_type == "publish":
                 publish_item(item_data, public_images, token)
             
