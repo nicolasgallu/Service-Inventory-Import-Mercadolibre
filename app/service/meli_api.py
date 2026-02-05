@@ -192,7 +192,7 @@ def publish_item(item_data, public_images, token):
     except Exception as error:
         return logger.error(error)
     
-    logger.info("intentando mandar datos a meli")
+    logger.info("Tryign to post item in mercadolibre..")    
 
     try:
         response = requests.post("https://api.mercadolibre.com/items", 
