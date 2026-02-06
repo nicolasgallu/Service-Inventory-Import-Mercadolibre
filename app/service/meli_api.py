@@ -3,7 +3,7 @@ import ast
 from app.utils.logger import logger
 from app.service.notifications import enviar_mensaje_whapi
 from app.service.ai_completation import completing_fields
-from app.service.database import load_meli_id, load_failed_status
+from app.service.database import load_meli_data, load_failed_status
 from app.service.bot import call_ai
 from app.settings.config import (
     TOKEN_WHAPI, PHONES, CURRENCY, BUY_MODE, CONDITION, 
@@ -215,9 +215,14 @@ def publish_item(item_data, public_images, token):
     
     if response.status_code in [200, 201]:
         meli_id = response.json().get('id')
+        permalink = response.json().get('permalink')
         logger.info(f"Publish of the item: {meli_id} successfully made.")
+        #setting description in mercadolibre
         set_description(meli_id, description, token)
-        load_meli_id(item_data['id'], {'meli_id': meli_id})
+
+        #saving data in DB
+        item_metadata = {'meli_id': meli_id, 'permalink': permalink}
+        load_meli_data(item_data['id'], item_metadata)
         return
     
 
@@ -242,17 +247,22 @@ def publish_item(item_data, public_images, token):
 
         if response.status_code in [200, 201]:
             meli_id = response.json().get('id')
+            permalink = response.json().get('permalink')
             logger.info(f"Publish of the item: {meli_id} successfully made in the second try.")
+            #setting description in mercadolibre
             set_description(meli_id, description, token)
-            load_meli_id(item_data['id'], {'meli_id': meli_id})
+            
+            #saving data in DB
+            item_metadata = {'meli_id': meli_id, 'permalink': permalink}
+            load_meli_data(item_data['id'], item_metadata)
             return
         
         else:
             logger.error(f"Failed to create item, response: {response.status_code} \n {response.json()}")
             usr_prompt = f"""ERROR AL INTENTAR PUBLICAR EL PRODUCTO A MERADOLIBRE: {response.status_code} - {response.json()}"""
             message = call_ai(usr_prompt, PROMPT_FAILED)
-            enviar_mensaje_whapi(TOKEN_WHAPI,PHONES, message)
             item_metadata = {'status': 'no publicado','reason': message}
+            enviar_mensaje_whapi(TOKEN_WHAPI,PHONES, message)
             load_failed_status(item_data['id'], item_metadata)
             return
 
