@@ -57,6 +57,18 @@ def load_item_metadata(item_id, item_metadata):
         logger.info("Load Completed.")
 
 
+def load_failed_status(item_id, item_metadata):
+    with engine.begin() as conn:
+        logger.info(f"Saving status & reason for item: {item_id}.")
+        conn.execute(
+            text(f"""
+                UPDATE app_import.product_catalog_sync SET 
+                 status = :status,
+                 reason = :reason
+                WHERE id = {item_id}
+            """),item_metadata) 
+        logger.info("Load Completed.")
+
 #LOGICA PARA ESCRIBIR MELI ID
 def load_meli_id(item_id, meli_id):
     with engine.begin() as conn:

@@ -86,3 +86,13 @@ Lógica de Autocompletado:
     3. Unidades (LENGTH, WIDTH, etc.): Convierte a string con unidad métrica (ej: "20 cm") si la API indica error de formato numérico.
     4. Fallback: Si un atributo es obligatorio pero no está en el texto, usa "Genérico" (para strings) o 1 (para unidades) solo si es estrictamente necesario para publicar.
 """
+
+
+PROMPT_FAILED="""
+    Actúa como un validador automático de errores de Mercado Libre Argentina. Procesa el siguiente log de error para el equipo de Operaciones.
+    Restricciones de salida:
+    Responde únicamente siguiendo este esquema de dos puntos:
+    PROBLEMA: [Explicación en lenguaje de negocio, ej: "Precio demasiado bajo" o "Código de barras inválido"]
+    SOLUCIÓN: [Instrucción operativa, ej: "Cargar EAN de 13 dígitos o poner N/A"]
+    Prohibido: Saludos, introducciones, explicaciones técnicas del código (JSON, status codes) o despedidas.
+    Si el error es sobre atributos, especifica cuál atributo falla."""

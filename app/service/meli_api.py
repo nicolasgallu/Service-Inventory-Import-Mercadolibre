@@ -3,10 +3,11 @@ import ast
 from app.utils.logger import logger
 from app.service.notifications import enviar_mensaje_whapi
 from app.service.ai_completation import completing_fields
-from app.service.database import load_meli_id
+from app.service.database import load_meli_id, load_failed_status
+from app.service.bot import call_ai
 from app.settings.config import (
     TOKEN_WHAPI, PHONES, CURRENCY, BUY_MODE, CONDITION, 
-    LISTING_TYPE, MODE, LOCAL_PICK_UP, FREE_SHIPPING, WARRANTY_TYPE,WARRANTY_TIME, DS_API_KEY, PROMPT_SYS_MELI)
+    LISTING_TYPE, MODE, LOCAL_PICK_UP, FREE_SHIPPING, WARRANTY_TYPE, WARRANTY_TIME, PROMPT_SYS_MELI, PROMPT_FAILED)
 
 
 
@@ -226,28 +227,12 @@ def publish_item(item_data, public_images, token):
         logger.warning(f"Failed to create item, response: {response.status_code}")
         logger.info("using AI to publish item (using restricted scopes).")
     
-        prompt_usr = f"""
-        ERROR_API: {response.status_code} - {response.json()}
-        PAYLOAD_ORIGINAL: {item_format}
-        REQUIRED_ATTRIBUTES: {required_attrs}"""
-        
-        headers = {
-            "Authorization": f"Bearer {DS_API_KEY}",
-            "Content-Type": "application/json"
-        }
+        usr_prompt = f"""
+            ERROR_API: {response.status_code} - {response.json()}
+            PAYLOAD_ORIGINAL: {item_format}
+            REQUIRED_ATTRIBUTES: {required_attrs}"""
 
-        payload = {
-            "model": "deepseek-chat",
-            "messages": [
-                    {"role": "system", "content": PROMPT_SYS_MELI},
-                    {"role": "user", "content": prompt_usr}
-                ],
-            "max_tokens": 2000,
-            "temperature": 0.45
-        }       
-
-        response = requests.post("https://api.deepseek.com/v1/chat/completions", headers=headers, json=payload)
-        item_data_fix = response.json()['choices'][0]['message']['content']
+        item_data_fix = call_ai(usr_prompt, PROMPT_SYS_MELI)
 
         #Trying to publish the item now with AI correction.
         item_data_fix=  ast.literal_eval(item_data_fix)
@@ -264,12 +249,12 @@ def publish_item(item_data, public_images, token):
         
         else:
             logger.error(f"Failed to create item, response: {response.status_code} \n {response.json()}")
-            message = f"""Fallo la publicacion del item {item_data['id']} en Mercadolibre.La respuesta fue:\n 
-            {response.json()}"""
-            enviar_mensaje_whapi(TOKEN_WHAPI,PHONES,message)
+            usr_prompt = f"""ERROR AL INTENTAR PUBLICAR EL PRODUCTO A MERADOLIBRE: {response.status_code} - {response.json()}"""
+            message = call_ai(usr_prompt, PROMPT_FAILED)
+            enviar_mensaje_whapi(TOKEN_WHAPI,PHONES, message)
+            item_metadata = {'status': 'no publicado','reason': message}
+            load_failed_status(item_data['id'], item_metadata)
             return
-
-
 
 
 
