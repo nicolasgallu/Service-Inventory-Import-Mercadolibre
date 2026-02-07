@@ -8,7 +8,7 @@ from app.settings.config import SECRET_GUIAS
 from flask import Blueprint, request, Response, jsonify
 
 # BLUEPRINT CREATION
-meli_publish = Blueprint("wh_publish", __name__, url_prefix="/webhooks/goog-app/publications")
+meli_publish = Blueprint("wh_publish", __name__, url_prefix="/webhooks/publications")
 
 def process_notification(response):
     """

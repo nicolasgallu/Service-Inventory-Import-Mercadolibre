@@ -69,6 +69,7 @@ def load_failed_status(item_id, item_metadata):
             """),item_metadata) 
         logger.info("Load Completed.")
 
+
 #LOGICA PARA ESCRIBIR MELI ID
 def load_meli_data(item_id, item_metadata):
     with engine.begin() as conn:
@@ -81,4 +82,17 @@ def load_meli_data(item_id, item_metadata):
                 WHERE id = {item_id}
             """),item_metadata) 
         logger.info("Load Completed.")
+
+
+#LOGICA PARA ESCRIBIR EN ORDERS
+def insert_order(order):
+    with engine.begin() as conn:
+        logger.info("Saving Order in DB.")
+        conn.execute(
+            text("""
+                INSERT INTO app_import.product_catalog_sync (id, meli_id, units, created_at)
+                VALUES (:id, :meli_id, :units, :created_at)
+            """),order) 
+        logger.info("Load Completed.")
+
 
