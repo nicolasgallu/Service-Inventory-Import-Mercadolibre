@@ -2,7 +2,6 @@ import requests
 import ast
 from app.utils.logger import logger
 from app.service.notifications import enviar_mensaje_whapi
-from app.service.ai_completation import completing_fields
 from app.service.database import load_meli_data, load_failed_status
 from app.service.bot import call_ai
 from app.settings.config import (
@@ -150,8 +149,6 @@ def publish_item(item_data, public_images, token):
         logger.warning(f"Item: {item_data['id']} already exists in mercadolibre under this ID: {item_data['meli_id']} nothing to do.")
         return
 
-    brand, description = completing_fields(item_data)
-
     ####TRYING TO PUBLISH FIRST TIME####
     logger.info(f"Attempting to create Item: {item_data['id']} in mercadolibre..")
     
@@ -160,7 +157,7 @@ def publish_item(item_data, public_images, token):
 
 
     item_format = {
-        "title": item_data["product_name"], 
+        "title": item_data["product_name_meli"], 
         "category_id": category_id, 
         "price": float(item_data["price"]), 
         "currency_id": CURRENCY, 
@@ -171,7 +168,7 @@ def publish_item(item_data, public_images, token):
         "pictures": public_images, 
         "attributes": [
             #{"id": "EAN", "value_name": item_data["product_code"]}, 
-            {"id": "BRAND", "value_name": brand},
+            {"id": "BRAND", "value_name": item_data["brand"]},
             {"id": "MODEL", "value_name": None},
             {"id": "VALUE_ADDED_TAX", "value_id": "48405909"},#48405909 es el 21% 55043032 excento y 48405907 es 0%
             {"id": "IMPORT_DUTY", "value_id": "49553239"}, #49553239 es 0
@@ -218,7 +215,7 @@ def publish_item(item_data, public_images, token):
         permalink = response.json().get('permalink')
         logger.info(f"Publish of the item: {meli_id} successfully made.")
         #setting description in mercadolibre
-        set_description(meli_id, description, token)
+        set_description(meli_id, item_data["description"], token)
 
         #saving data in DB
         item_metadata = {'meli_id': meli_id, 'permalink': permalink}
@@ -250,7 +247,7 @@ def publish_item(item_data, public_images, token):
             permalink = response.json().get('permalink')
             logger.info(f"Publish of the item: {meli_id} successfully made in the second try.")
             #setting description in mercadolibre
-            set_description(meli_id, description, token)
+            set_description(meli_id, item_data["description"], token)
             
             #saving data in DB
             item_metadata = {'meli_id': meli_id, 'permalink': permalink}

@@ -7,19 +7,15 @@ SECRET_ID=os.getenv("SECRET_ID")
 
 SECRET_GUIAS=os.getenv("SECRET_GUIAS")
 
-
 DS_API_KEY=os.getenv("DS_API_KEY")
-
 
 INSTANCE_DB=os.getenv("INSTANCE_DB")
 USER_DB=os.getenv("USER_DB")
 PASSWORD_DB=os.getenv("PASSWORD_DB")
 NAME_DB=os.getenv("NAME_DB")
 
-
 TOKEN_WHAPI=os.getenv("TOKEN_WHAPI")
 PHONES=os.getenv("PHONES")
-
 
 CURRENCY=os.getenv("CURRENCY")
 BUY_MODE=os.getenv("BUY_MODE")
@@ -31,32 +27,8 @@ FREE_SHIPPING=os.getenv("FREE_SHIPPING")
 WARRANTY_TYPE=os.getenv("WARRANTY_TYPE")
 WARRANTY_TIME=os.getenv("WARRANTY_TIME")
 
-
 ID_CARPETA_MADRE=os.getenv("ID_CARPETA_MADRE")
 BUCKET_NAME=os.getenv("BUCKET_NAME")
-
-
-#PROMPTS FOR CREATING EMPTY FIELDS
-PROMPT_SYS_DESCR = """
-Tu tarea es crear una descripción de producto para una página web, 
-basándote ESTRICTA Y ÚNICAMENTE en el nombre del producto que voy a compartirte.
-Reglas importantes:
-1.  *No inventes información:* No menciones materiales (plástico, madera, etc.), dimensiones (cm, pulgadas), 
-  colores, origen o detalles de fabricación a menos que estén escritos textualmente en el nombre del producto.
-2.  *Mantén un tono formal y descriptivo:* Evita el lenguaje de marketing exagerado y los emojis.
-3.  *Sé genérico si la información es limitada:* Si el nombre es simple, la descripción también debe serlo. 
-El objetivo es describir el producto sin crear falsas expectativas."""
-
-PROMPT_SYS_BRAND = """
-Tu tarea es identificar la MARCA de un producto basándote en su nombre comercial. 
-Reglas estrictas:
-1. Extrae el nombre del fabricante o marca comercial presente en el texto.
-2. Si el nombre del producto NO contiene una marca explícita, pero el modelo es universalmente reconocido 
-(ej. 'iPhone 13' -> Apple), devuelve la marca correspondiente.
-3. Si el producto es genérico o no hay ninguna pista sobre el fabricante, responde ÚNICAMENTE con la palabra: 'Genérico'.
-4. No añadas explicaciones, adjetivos ni texto adicional. Solo el nombre de la marca.
-5. Si detectas varias marcas (ej. una colaboración), menciona ambas separadas por una coma."""
-
 
 #PROMPTS FOR AI HELPER (second try to publish item in Meli)
 PROMPT_SYS_MELI = """

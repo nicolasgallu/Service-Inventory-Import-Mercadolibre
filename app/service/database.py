@@ -3,6 +3,10 @@ from google.cloud.sql.connector import Connector
 from app.settings.config import INSTANCE_DB, USER_DB, PASSWORD_DB, NAME_DB
 from app.utils.logger import logger
 
+##!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+##CAMBIAR ESQUEMAS FIJOS A PARAMETROS 
+##!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 
 def getconn():
     connector = Connector() 
@@ -22,7 +26,6 @@ engine = create_engine(
         max_overflow=2,
     )
 
-#LOGICA PARA ACCEDER A DATOS DEL ITEM.
 def get_item_data(item_id):
     """"""
     with engine.begin() as conn:
@@ -42,18 +45,17 @@ def get_item_data(item_id):
             return None
         
 
-#LOGICA PARA ESCRIBIR DATOS DEL ITEM.
-def load_item_metadata(item_id, item_metadata):
+def load_ai_response(item_id, field ,ai_response):
+    """writting field description or title using ai reply,
+    this is part from the pre-publish event."""
     with engine.begin() as conn:
-        logger.info(f"Saving description & brand for item: {item_id}.")
+        logger.info(f"Saving {field} for item: {item_id}.")
         conn.execute(
             text(f"""
                 UPDATE app_import.product_catalog_sync SET 
-                 description = :description,
-                 brand = :brand
+                {field} = :ai_response
                 WHERE id = {item_id}
-            """),item_metadata) 
-
+            """),ai_response) 
         logger.info("Load Completed.")
 
 
@@ -83,16 +85,54 @@ def load_meli_data(item_id, item_metadata):
             """),item_metadata) 
         logger.info("Load Completed.")
 
+#//////////////MELI ORDERS LOGIC//////////////
 
-#LOGICA PARA ESCRIBIR EN ORDERS
+def get_order(order_id):
+    """Checking if order exists in DB
+    Returns True if exists otherwise False."""
+    with engine.begin() as conn:
+        logger.info("Getting order from DB.")
+        result = conn.execute(
+            text(f"""
+                SELECT
+                id
+                FROM mercadolibre.orders
+                WHERE id = {order_id};
+            """)
+        )
+        data = [dict(row) for row in result.mappings()][0]
+        if data:
+            return True
+        else:
+            return False
+
 def insert_order(order):
     with engine.begin() as conn:
         logger.info("Saving Order in DB.")
         conn.execute(
             text("""
-                INSERT INTO app_import.product_catalog_sync (id, meli_id, units, created_at)
-                VALUES (:id, :meli_id, :units, :created_at)
+                INSERT INTO mercadolibre.orders (id, data, created_at)
+                VALUES (:id, :data, :created_at)
             """),order) 
         logger.info("Load Completed.")
 
-
+def get_bitcram_data(meli_id):
+    """"""
+    with engine.begin() as conn:
+        logger.info(f"Extracting data from Meli_ID: {meli_id}.")
+        result = conn.execute(
+            text(f"""
+                SELECT
+                id,
+                cost
+                FROM app_import.product_catalog_sync
+                WHERE meli_id = '{meli_id}';
+            """)
+        )
+        data = [dict(row) for row in result.mappings()][0]
+        if data:
+            logger.info("Data extraction completed.")
+            return data
+        else:
+            logger.info("Data extraction failed.")
+            return None
