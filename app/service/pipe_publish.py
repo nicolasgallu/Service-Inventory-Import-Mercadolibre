@@ -23,7 +23,6 @@ def pipeline_publish(response):
             pause_item(item_data, token)
 
         elif event_type in ["publish", "update"]:
-
             token = meli_secrets()
             public_images = process_images_storage(item_id)
             if public_images == []:
