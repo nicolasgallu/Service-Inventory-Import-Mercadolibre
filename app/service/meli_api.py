@@ -112,9 +112,8 @@ def publish_item(item_data, public_images, token):
 def update_item(item_data, public_images, token):
     """Update MercadoLibre item"""
     meli_id = item_data['meli_id']
-    logger.info(f"the meli id is: {meli_id}")
     if meli_id is None or meli_id == '':
-        logger.error(f"Item: {item_data['item_id']} doesnt exists in mercadolibre, nothing to update.")
+        logger.error(f"Item: {item_data['id']} doesnt exists in mercadolibre, nothing to update.")
         return
     if item_data['price'] < 1000 or item_data['price'] is None:
         logger.error("Product Price < $1000")
