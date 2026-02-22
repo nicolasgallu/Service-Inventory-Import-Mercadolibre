@@ -115,26 +115,36 @@ def update_item(item_data, public_images, token):
         load_failed_status(item_data['id'], item_metadata)
         return
     
-    logger.info(f"Attempting to update Item: {meli_id} from mercadolibre..")
-    new_data = { "price": float(item_data['price']) , 
-         "available_quantity": item_data['stock'] , 
-         "pictures": public_images
-         
-    }
-    response = requests.put(f"https://api.mercadolibre.com/items/{meli_id}", 
-                            json=new_data, 
-                            headers={"Authorization": f"Bearer {token}"})
+    status,sub_status = item_status(meli_id, token)
     
-    if response.status_code in [200, 201]:
-        set_description(meli_id, item_data['description'] , token, update=True)
-        item_reactivate(meli_id, token)
-        return
+    if status == 'under_review' and  sub_status  == 'forbidden':
+        logger.info(f"Product in Forbidden status: {meli_id}, we are gonna delete and publish again..")
+        response = requests.put(f"https://api.mercadolibre.com/items/{meli_id}", 
+                                json={"deleted":"true"}, 
+                                headers={"Authorization": f"Bearer {token}"})
+        publish_item(item_data, public_images, token)
+    
     else:
-        logger.error(f"Failed to update item: {meli_id} \n {response.json()}")
-        message = f"""Fallo la actualizacion del item {meli_id} en Mercadolibre. La respuesta fue:\n
-        {response.json()}"""
-        enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, message)
-        return
+        logger.info(f"Attempting to update Item: {meli_id} from mercadolibre..")
+        new_data = { "price": float(item_data['price']) , 
+             "available_quantity": item_data['stock'] , 
+             "pictures": public_images
+
+        }
+        response = requests.put(f"https://api.mercadolibre.com/items/{meli_id}", 
+                                json=new_data, 
+                                headers={"Authorization": f"Bearer {token}"})
+
+        if response.status_code in [200, 201]:
+            set_description(meli_id, item_data['description'] , token, update=True)
+            item_reactivate(meli_id, status, token)
+            return
+        else:
+            logger.error(f"Failed to update item: {meli_id} \n {response.json()}")
+            message = f"""Fallo la actualizacion del item {meli_id} en Mercadolibre. La respuesta fue:\n
+            {response.json()}"""
+            enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, message)
+            return
         
 def pause_item(item_data, token):
     """Changes item status to paused in Mercado Libre"""
@@ -272,17 +282,25 @@ def set_description(meli_id, description, token, update=False):
         logger.error(f"Failed to load description for product {meli_id}: {response.status_code} - {response.text}")
     return response.json()
 
-def item_reactivate(meli_id, token):
-    """
-    If item is paused, then try to republish, else dont do anything.
-    """
+def item_status(meli_id, token):
     logger.info(f"Validating current status for item: {meli_id}")
     headers = {"Authorization": f"Bearer {token}"}
     response = requests.get(
         f"https://api.mercadolibre.com/items/{meli_id}", 
         headers=headers
     )
-    if response.json().get('status') == 'paused':
+    status = response.json().get('status')
+    sub_status = response.json().get('sub_status')[0]
+    return status,sub_status
+
+def item_reactivate(meli_id, status, token):
+    """
+    If item is paused, then try to republish, else dont do anything.
+    """
+    logger.info(f"Validating current status for item: {meli_id}")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    if status == 'paused':
         logger.info(f"Item {meli_id} is PAUSED. Attempting to re-activate...")
         url = f"https://api.mercadolibre.com/items/{meli_id}"
         payload = {"status": "active"}
@@ -296,3 +314,5 @@ def item_reactivate(meli_id, token):
                         la respuesta fue\n {response.text}"""
             enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, message)
             return
+    else:
+        return

@@ -9,3 +9,4 @@ __pycache__/
 test_webhook.py
 test_process_sell.py
 test_post_bitcram.py
+test.py
