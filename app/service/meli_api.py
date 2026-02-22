@@ -99,6 +99,10 @@ def publish_item(item_data, public_images, token):
         load_meli_data(item_data['id'], item_metadata)
         return
     
+    else:
+        logger.info(response.json())
+        p_second_attempt(item_data, item_format, category_id, token, response)
+    
 def update_item(item_data, public_images, token):
     """Update MercadoLibre item"""
     meli_id = item_data['meli_id']
