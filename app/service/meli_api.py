@@ -94,7 +94,13 @@ def publish_item(item_data, public_images, token):
         logger.info("Publish of the item successfully made.")
         meli_id = response.json().get('id')
         permalink = response.json().get('permalink')
-        item_metadata = {'meli_id': meli_id, 'permalink': permalink}
+        item_metadata = {
+            'meli_id': meli_id, 
+            'permalink': permalink, 
+            'status': 'procesing..',
+            'reason': 'procesing..',
+            'remedy': 'procesing..',
+        }
         set_description(meli_id, item_data["description"], token)
         load_meli_data(item_data['id'], item_metadata)
         return
@@ -117,13 +123,20 @@ def update_item(item_data, public_images, token):
     
     status,sub_status = item_status(meli_id, token)
     
-    if status == 'under_review' and  sub_status  == 'forbidden':
+    if status == 'under_review' and sub_status == 'forbidden':
         logger.info(f"Product in Forbidden status: {meli_id}, we are gonna delete and publish again..")
         response = requests.put(f"https://api.mercadolibre.com/items/{meli_id}", 
                                 json={"deleted":"true"}, 
                                 headers={"Authorization": f"Bearer {token}"})
+        item_metadata = {
+            'meli_id': None, 
+            'permalink': None, 
+            'status': 'procesing..',
+            'reason': 'procesing..',
+            'remedy': 'procesing..',
+        }
+        load_meli_data(item_data['id'], item_metadata)
         publish_item(item_data, public_images, token)
-    
     else:
         logger.info(f"Attempting to update Item: {meli_id} from mercadolibre..")
         new_data = { "price": float(item_data['price']) , 
@@ -141,7 +154,7 @@ def update_item(item_data, public_images, token):
             return
         else:
             logger.error(f"Failed to update item: {meli_id} \n {response.json()}")
-            message = f"""Fallo la actualizacion del item {meli_id} en Mercadolibre. La respuesta fue:\n
+            message = f"""Fallo la actualizacion del item {meli_id} en Mercadolibre. La respuesta fue:\nÑ
             {response.json()}"""
             enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, message)
             return
@@ -192,7 +205,13 @@ def p_second_attempt(item_data, item_format, category_id, token, response):
         logger.info("Publish of the item successfully made in the second try.")
         meli_id = response.json().get('id')
         permalink = response.json().get('permalink')
-        item_metadata = {'meli_id': meli_id, 'permalink': permalink}
+        item_metadata = {
+            'meli_id': meli_id, 
+            'permalink': permalink, 
+            'status': 'procesing..',
+            'reason': 'procesing..',
+            'remedy': 'procesing..',
+        }
         set_description(meli_id, item_data["description"], token)
         load_meli_data(item_data['id'], item_metadata)
         return
@@ -291,6 +310,7 @@ def item_status(meli_id, token):
     )
     status = response.json().get('status')
     sub_status = response.json().get('sub_status')[0]
+    logger.info(f"status output: {status} : {sub_status}")
     return status,sub_status
 
 def item_reactivate(meli_id, status, token):

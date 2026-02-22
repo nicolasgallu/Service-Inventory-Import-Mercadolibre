@@ -80,7 +80,11 @@ def load_meli_data(item_id, item_metadata):
             text(f"""
                 UPDATE app_import.product_catalog_sync SET 
                  meli_id = :meli_id,
-                 permalink = :permalink
+                 permalink = :permalink,
+                 status = :status,
+                 reason = :reason,
+                 remedy = :remedy
+
                 WHERE id = {item_id}
             """),item_metadata) 
         logger.info("Load Completed.")
