@@ -136,6 +136,7 @@ def update_item(item_data, public_images, token):
             'remedy': 'procesing..',
         }
         load_meli_data(item_data['id'], item_metadata)
+        item_data['meli_id'] = None
         publish_item(item_data, public_images, token)
     else:
         logger.info(f"Attempting to update Item: {meli_id} from mercadolibre..")
