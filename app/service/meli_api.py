@@ -310,7 +310,7 @@ def item_status(meli_id, token):
         headers=headers
     )
     status = response.json().get('status')
-    sub_status = response.json().get('sub_status')[0]
+    sub_status = next(iter(response.json().get('sub_status') or []), 'good')
     logger.info(f"status output: {status} : {sub_status}")
     return status,sub_status
 
