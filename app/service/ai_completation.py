@@ -7,12 +7,10 @@ from app.settings.config import DS_API_KEY
 def ai_call_prepublish(event_data, item_data):
     """generates description/title and if is not already made the brand."""
     
-    #data del item
     item_id = item_data.get('id')
     title = item_data.get('product_name')
     brand = item_data.get('brand')
-    
-    #data del evento
+
     field = event_data.get('data').get('field')
     user_prompt = event_data.get('data').get('prompt')
 
