@@ -126,7 +126,7 @@ def update_item(item_data, public_images, token):
                             headers={"Authorization": f"Bearer {token}"})
     
     if response.status_code in [200, 201]:
-        set_description(meli_id, item_data['description'] , token)
+        set_description(meli_id, item_data['description'] , token, update=True)
         item_reactivate(meli_id, token)
         return
     else:
@@ -253,7 +253,7 @@ def get_category_id(product_name, token):
         logger.info("Failed to create Category ID")
         return None
 
-def set_description(meli_id, description, token):
+def set_description(meli_id, description, token, update=False):
     """Load Description to Mercadolibre"""
     logger.info(f"Writting Description in product: {meli_id}")
     url = f"https://api.mercadolibre.com/items/{meli_id}/description"
@@ -262,7 +262,10 @@ def set_description(meli_id, description, token):
         "Content-Type": "application/json"}
     
     payload = {"plain_text": description}
-    response = requests.post(url, json=payload, headers=headers)
+    if update == True:
+        response = requests.put(url, json=payload, headers=headers)
+    else:
+        response = requests.post(url, json=payload, headers=headers)
     if response.status_code in [200, 201]:
         logger.info(f"Description loaded for product: {meli_id}")
     else:
