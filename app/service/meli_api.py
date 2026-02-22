@@ -92,10 +92,13 @@ def publish_item(item_data, public_images, token):
                     json=item_format,
                     headers={"Authorization": f"Bearer {token}"})
         
+        logger.info(response)
+        
     except Exception as error:
         logger.error(error)
         p_second_attempt(item_data, item_format, category_id, token)
     
+    logger.info("runnning load data..")
     if response.status_code in [200, 201]:
         logger.info("Publish of the item successfully made.")
         meli_id = response.json().get('id')
