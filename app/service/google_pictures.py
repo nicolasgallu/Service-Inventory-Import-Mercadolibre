@@ -1,4 +1,5 @@
 import io
+from datetime import datetime
 from googleapiclient.http import MediaIoBaseDownload
 from google.cloud import storage
 import google.auth
@@ -28,7 +29,6 @@ def get_services():
         bucket_client = storage_client.bucket(BUCKET_NAME)
         
         return drive_service, bucket_client
-
     except Exception as e:
         logger.error(f"Error al inicializar servicios de GCP: {e}")
         raise
@@ -78,8 +78,7 @@ def process_images_storage(item_id):
     # 3. Descarga y Carga (Stream)
     for index, file in enumerate(last_5_files):
         file_id = file['id']
-        # Definimos el nombre de destino en el Bucket (sobrescribe si ya existe)
-        blob_name = f"{item_id}/foto_{index + 1}.png"
+        blob_name = f"{item_id}/foto_{datetime.now().isoformat()}_{index + 1}.png"
         blob = bucket_client.blob(blob_name)
 
         # Descarga de Drive a Buffer de memoria

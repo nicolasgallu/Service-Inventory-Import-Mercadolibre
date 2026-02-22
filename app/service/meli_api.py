@@ -112,9 +112,7 @@ def update_item(item_data, public_images, token):
     }
     response = requests.put(f"https://api.mercadolibre.com/items/{meli_id}", 
                             json=new_data, 
-                            headers={"Authorization": f"Bearer {token}"}) 
-    #EL PROBLEMA DEL UPDATE DE FOTOS SE DEBE A QUE NO PUEDEN REEMPLAZARSE PICS CON EL MISMO NOMBRE
-    #Y NOSTROS FORMATEAMOS LAS CARPETAS Y DEJAMOS EL NOMBRE IGUAL QUE ANTES POR MAS QUE CAMBIEN LAS FOTOS..
+                            headers={"Authorization": f"Bearer {token}"})
     
     if response.status_code in [200, 201]:
         set_description(meli_id, item_data['description'] , token)
