@@ -75,6 +75,12 @@ def process_images_storage(item_id):
 
     logger.info(f"Processing {len(last_5_files)} images from item: {item_id}...")
 
+
+    blobs = bucket_client.list_blobs(prefix=f"{item_id}/")
+    if blobs:
+        for blob in blobs:
+            blob.delete()
+
     # 3. Descarga y Carga (Stream)
     for index, file in enumerate(last_5_files):
         file_id = file['id']
