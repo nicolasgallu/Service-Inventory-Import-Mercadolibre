@@ -74,6 +74,7 @@ def publish_item(item_data, public_images, token):
     except Exception as error:
         return logger.error(error)
 
+    logger.info("analizing product code")
     if len(item_data['product_code']) not in [8,12,13,14]:
         product_code = {"id": "SELLER_SKU", "value_name": item_data['product_code']}
         attr_gtin = {"id": "GTIN", "value_name": "N/A"}
@@ -85,6 +86,7 @@ def publish_item(item_data, public_images, token):
         product_code = {"id": "GTIN", "value_name": item_data['product_code']}
         item_format['attributes'].append(product_code)
 
+    logger.info("posting..")
     try:
         response = requests.post("https://api.mercadolibre.com/items", 
                     json=item_format,
