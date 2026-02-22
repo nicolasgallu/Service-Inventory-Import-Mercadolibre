@@ -1,5 +1,5 @@
-import requests
 import ast
+import requests
 from app.utils.logger import logger
 from app.service.notifications import enviar_mensaje_whapi
 from app.service.database import load_meli_data, load_failed_status
@@ -9,55 +9,182 @@ from app.settings.config import (
     LISTING_TYPE, MODE, LOCAL_PICK_UP, FREE_SHIPPING, WARRANTY_TYPE, WARRANTY_TIME, PROMPT_SYS_MELI, PROMPT_FAILED)
 
 
+def publish_item(item_data, public_images, token):
+    """publish the item with a second try option"""
 
-
-###/////////////////////FUNCIONES AUXILIARES///////////////////////////###
-def get_category_id(product_name, token):
-    """Generate category ID trough Mercadolibre AI"""
-    logger.info("Getting category ID from Meli API..")
-    response = requests.get("https://api.mercadolibre.com/sites/MLA/domain_discovery/search", 
-                            params={"q": product_name, "limit": 1}, 
-                            headers={"Authorization": f"Bearer {token}"})
-    if response.status_code == 200 and response.json():
-        category_id = response.json()[0].get("category_id", None)
-        logger.info(f"Category ID Selected: {category_id}")
-        return category_id
-    return None
-
-
-def set_description(meli_id, description, token):
-
-    logger.info(f"Writting Description in product: {meli_id}")
-    url = f"https://api.mercadolibre.com/items/{meli_id}/description"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"}
+    logger.info("checking if product is already publish..")
+    if item_data['meli_id']:
+        logger.warning(f"""Item: {item_data['id']} already exists in mercadolibre 
+            under this ID: {item_data['meli_id']} nothing to do.""")
+        return
     
-    payload = {"plain_text": description}
-    response = requests.post(url, json=payload, headers=headers)
+    logger.info("checking if product accoumplish minimum price value..")    
+    if item_data["price"] < 1000 or item_data["price"] is None:
+        logger.error("Product Price < $1000")
+        item_metadata = {'status': 'no publicado','reason': 'precio del producto no cumple el minimo de MercadoLibre'}
+        load_failed_status(item_data['id'], item_metadata)
+        return
+
+    logger.info("Getting Category ID..")    
+    category_id = get_category_id(item_data["product_name"], token)
+    if category_id is None:
+        item_metadata = {
+            'status': 'no publicado',
+            'reason': 'Mercadolibre no logro crear un category ID, se recomienda modificar el titulo u intentar publicar manualmente.'}
+        load_failed_status(item_data['id'], item_metadata)
+        return
+    
+    logger.info("Attempting to publish the product in mercadolibre..")
+    item_format = {
+        "title": item_data["product_name_meli"], 
+        "category_id": category_id, 
+        "price": float(item_data["price"]), 
+        "currency_id": CURRENCY, 
+        "available_quantity": item_data["stock"],
+        "buying_mode": BUY_MODE, 
+        "condition": CONDITION, 
+        "listing_type_id": LISTING_TYPE,
+        "pictures": public_images, 
+        "attributes": [
+            {"id": "BRAND", "value_name": item_data["brand"]},
+            {"id": "MODEL", "value_name": None},
+            {"id": "VALUE_ADDED_TAX", "value_id": "48405909"},#48405909 es el 21% 55043032 excento y 48405907 es 0%
+            {"id": "IMPORT_DUTY", "value_id": "49553239"}, #49553239 es 0
+            {"id": "UNITS_PER_PACK", "value_name": "1"}
+        ],
+        "shipping": { 
+            "mode": MODE, 
+            "local_pick_up": LOCAL_PICK_UP,
+            "free_shipping": FREE_SHIPPING 
+        },
+        "sale_terms": [
+            {"id": "WARRANTY_TYPE", "value_name": WARRANTY_TYPE}, 
+            {"id": "WARRANTY_TIME", "value_name": WARRANTY_TIME},
+        ]
+    }
+
+    if len(item_data['product_code']) not in [8,12,13,14]:
+        product_code = {"id": "SELLER_SKU", "value_name": item_data['product_code']}
+        attr_gtin = {"id": "GTIN", "value_name": "N/A"}
+        gtin_reason = {"id": "EMPTY_GTIN_REASON", "value_id": "17055160"}
+        item_format['attributes'].append(product_code)
+        item_format['attributes'].append(attr_gtin)
+        item_format['attributes'].append(gtin_reason)
+    else:
+        product_code = {"id": "GTIN", "value_name": item_data['product_code']}
+        item_format['attributes'].append(product_code)
+
+    try:
+        response = requests.post("https://api.mercadolibre.com/items", 
+                    json=item_format,
+                    headers={"Authorization": f"Bearer {token}"})
+        
+    except Exception as error:
+        logger.error(error)
+        p_second_attempt(item_data, item_format, category_id, token)
+    
     if response.status_code in [200, 201]:
-        logger.info(f"Description loaded for product: {meli_id}")
+        logger.info("Publish of the item successfully made.")
+        meli_id = response.json().get('id')
+        permalink = response.json().get('permalink')
+        item_metadata = {'meli_id': meli_id, 'permalink': permalink}
+        set_description(meli_id, item_data["description"], token)
+        load_meli_data(item_data['id'], item_metadata)
+        return
+
+def update_item(item_data, public_images, token):
+    """Update MercadoLibre item"""
+    meli_id = item_data['meli_id']
+    if meli_id is None:
+        logger.error(f"Item: {item_data['item_id']} doesnt exists in mercadolibre, nothing to update.")
+        return
+    if item_data['price'] < 1000 or item_data['price'] is None:
+        logger.error("Product Price < $1000")
+        item_metadata = {'status': 'no actualizado','reason': 'precio del producto no cumple el minimo de MercadoLibre'}
+        load_failed_status(item_data['id'], item_metadata)
+        return
+    
+    logger.info(f"Attempting to update Item: {meli_id} from mercadolibre..")
+    new_data = { "price": float(item_data['price']) , 
+         "available_quantity": item_data['stock'] , 
+         "pictures": public_images
+         
+    }
+    response = requests.put(f"https://api.mercadolibre.com/items/{meli_id}", 
+                            json=new_data, 
+                            headers={"Authorization": f"Bearer {token}"}) 
+    #EL PROBLEMA DEL UPDATE DE FOTOS SE DEBE A QUE NO PUEDEN REEMPLAZARSE PICS CON EL MISMO NOMBRE
+    #Y NOSTROS FORMATEAMOS LAS CARPETAS Y DEJAMOS EL NOMBRE IGUAL QUE ANTES POR MAS QUE CAMBIEN LAS FOTOS..
+    
+    if response.status_code in [200, 201]:
+        set_description(meli_id, item_data['description'] , token)
+        item_reactivate(meli_id, token)
+        return
     else:
-        logger.error(f"Failed to load description for product {meli_id}: {response.status_code} - {response.text}")
-    return response.json()
+        logger.error(f"Failed to update item: {meli_id} \n {response.json()}")
+        message = f"""Fallo la actualizacion del item {meli_id} en Mercadolibre. La respuesta fue:\n
+        {response.json()}"""
+        enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, message)
+        return
+        
+def pause_item(item_data, token):
+    """Changes item status to paused in Mercado Libre"""
+    meli_id = item_data['meli_id'] 
+    if meli_id is None:
+        logger.error(f"Item: {item_data['id']} doesnt exists in mercadolibre, nothing to pause.")
+        return
+
+    logger.info(f"Attempting to pause item: {meli_id}")
+    try:
+        response = requests.put(
+            f"https://api.mercadolibre.com/items/{meli_id}", 
+            json={"status": "paused"},
+            headers={ "Authorization": f"Bearer {token}", "Content-Type": "application/json"})
+        if response.status_code == 200:
+            logger.info(f"Item {meli_id} successfully paused (status: paused).")
+            return
+        else:
+            logger.error(f"Failed to pause item {meli_id}. Status: {response.status_code}, Error:\n {response.json()}")
+            enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, response.json())
+            return
+    except Exception as error:
+        logger.error(f"Unexpected error while pausing {meli_id}:\n {str(error)}")
+        enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, error)
+        return
 
 
 
-def update_description(meli_id, description, token):
+def p_second_attempt(item_data, item_format, category_id, token):
+    """AI modifies attributes in order to publish the product in meli"""
 
-    url = f"https://api.mercadolibre.com/items/{meli_id}/description"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"}
-    payload = {"plain_text": description}
-    response = requests.put(url, json=payload, headers=headers)
-    if response.status_code in [200, 204]:
-        logger.info(f"Description of product: {meli_id} succesfully updated")
+    logger.info("using AI to publish item (using restricted scopes).")
+    required_attrs = get_required_attributes(category_id, token)
+    usr_prompt = f"""
+        ERROR_API: {response.status_code} - {response.json()}
+        PAYLOAD_ORIGINAL: {item_format}
+        REQUIRED_ATTRIBUTES: {required_attrs}"""
+
+    item_data_fix = call_ai(usr_prompt, PROMPT_SYS_MELI)
+    item_data_fix=  ast.literal_eval(item_data_fix)
+    response = requests.post("https://api.mercadolibre.com/items", 
+                             json=item_data_fix, 
+                             headers={"Authorization": f"Bearer {token}"})
+    if response.status_code in [200, 201]:
+        logger.info("Publish of the item successfully made in the second try.")
+        meli_id = response.json().get('id')
+        permalink = response.json().get('permalink')
+        item_metadata = {'meli_id': meli_id, 'permalink': permalink}
+        set_description(meli_id, item_data["description"], token)
+        load_meli_data(item_data['id'], item_metadata)
+        return
     else:
-        logger.error(f"Description of product {meli_id} failed to updated: {response.status_code} - {response.text}")
-    return response
-
-
+        logger.error(f"Failed to create item, response: {response.status_code} \n {response.json()}")
+        usr_prompt = f"""ERROR AL INTENTAR PUBLICAR EL PRODUCTO A MERADOLIBRE: {response.status_code} - {response.json()}"""
+        message = call_ai(usr_prompt, PROMPT_FAILED)
+        item_metadata = {'status': 'no publicado','reason': message}
+        enviar_mensaje_whapi(TOKEN_WHAPI,PHONES, message)
+        load_failed_status(item_data['id'], item_metadata)
+        return
 
 def get_required_attributes(category_id, token):
     """
@@ -102,235 +229,58 @@ def get_required_attributes(category_id, token):
         logger.error(f"Error fetching attributes for {category_id}: {e}")
         return []
 
+def get_category_id(product_name, token):
+    """ Generate category ID trough Mercadolibre AI API
+        Returns Category ID else None
+    """
+    response = requests.get("https://api.mercadolibre.com/sites/MLA/domain_discovery/search", 
+                            params={"q": product_name, "limit": 1}, 
+                            headers={"Authorization": f"Bearer {token}"})
+    if response.status_code == 200 and response.json():
+        category_id = response.json()[0].get("category_id", None)
+        logger.info(f"Category ID Created: {category_id}")
+        return category_id
+    else:
+        logger.info("Failed to create Category ID")
+        return None
 
+def set_description(meli_id, description, token):
+    """Load Description to Mercadolibre"""
+    logger.info(f"Writting Description in product: {meli_id}")
+    url = f"https://api.mercadolibre.com/items/{meli_id}/description"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"}
+    
+    payload = {"plain_text": description}
+    response = requests.post(url, json=payload, headers=headers)
+    if response.status_code in [200, 201]:
+        logger.info(f"Description loaded for product: {meli_id}")
+    else:
+        logger.error(f"Failed to load description for product {meli_id}: {response.status_code} - {response.text}")
+    return response.json()
 
 def item_reactivate(meli_id, token):
     """
-    Busca el ítem. Si está pausado, intenta republicarlo.
+    If item is paused, then try to republish, else dont do anything.
     """
     logger.info(f"Validating current status for item: {meli_id}")
-    
-    # 1. Consultar el estado actual del ítem
     headers = {"Authorization": f"Bearer {token}"}
     response = requests.get(
         f"https://api.mercadolibre.com/items/{meli_id}", 
         headers=headers
     )
-    status = response.json().get('status')
-
-    # 2. Condición: Si está pausado, republicar ############################### solo pausados? y si estan en un estado como inactivo?
-    if status == 'paused':
+    if response.json().get('status') == 'paused':
         logger.info(f"Item {meli_id} is PAUSED. Attempting to re-activate...")
-
         url = f"https://api.mercadolibre.com/items/{meli_id}"
         payload = {"status": "active"}
         response = requests.put(url, json=payload, headers=headers)
-
         if response.status_code == 200:
             logger.info(f"Item {meli_id} is now ACTIVE.")
-            return True
+            return
         else:
             logger.error(f"Failed to re-activate item {meli_id}: {response.text}")
             message = f"""Fallo en la etapa de reactivar el item: {meli_id} en Mercadolibre.
                         la respuesta fue\n {response.text}"""
             enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, message)
-            return False
-    return True
-
-
-
-
-
-###/////////////////////PUBLISH EVENT///////////////////////////###
-def publish_item(item_data, public_images, token):
-    """publish the item with a second try option"""
-
-    if item_data['meli_id']:
-        logger.warning(f"Item: {item_data['id']} already exists in mercadolibre under this ID: {item_data['meli_id']} nothing to do.")
-        return
-
-    ####TRYING TO PUBLISH FIRST TIME####
-    logger.info(f"Attempting to create Item: {item_data['id']} in mercadolibre..")
-    
-    category_id = get_category_id(item_data["product_name"], token)
-    required_attrs = get_required_attributes(category_id, token)
-
-
-    item_format = {
-        "title": item_data["product_name_meli"], 
-        "category_id": category_id, 
-        "price": float(item_data["price"]), 
-        "currency_id": CURRENCY, 
-        "available_quantity": item_data["stock"],
-        "buying_mode": BUY_MODE, 
-        "condition": CONDITION, 
-        "listing_type_id": LISTING_TYPE,
-        "pictures": public_images, 
-        "attributes": [
-            #{"id": "EAN", "value_name": item_data["product_code"]}, 
-            {"id": "BRAND", "value_name": item_data["brand"]},
-            {"id": "MODEL", "value_name": None},
-            {"id": "VALUE_ADDED_TAX", "value_id": "48405909"},#48405909 es el 21% 55043032 excento y 48405907 es 0%
-            {"id": "IMPORT_DUTY", "value_id": "49553239"}, #49553239 es 0
-            {"id": "UNITS_PER_PACK", "value_name": "1"}
-        ],
-        "shipping": { 
-            "mode": MODE, 
-            "local_pick_up": LOCAL_PICK_UP,
-            "free_shipping": FREE_SHIPPING 
-        },
-        "sale_terms": [
-            {"id": "WARRANTY_TYPE", "value_name": WARRANTY_TYPE}, 
-            {"id": "WARRANTY_TIME", "value_name": WARRANTY_TIME},
-        ]
-        }
-    
-
-    if len(item_data['product_code']) not in [8,12,13,14]:
-        product_code = {"id": "SELLER_SKU", "value_name": item_data['product_code']}
-        attr_gtin = {"id": "GTIN", "value_name": "N/A"}
-        gtin_reason = {"id": "EMPTY_GTIN_REASON", "value_id": "17055160"}
-        item_format['attributes'].append(product_code)
-        item_format['attributes'].append(attr_gtin)
-        item_format['attributes'].append(gtin_reason)
-
-    else:
-        product_code = {"id": "GTIN", "value_name": item_data['product_code']}
-        item_format['attributes'].append(product_code)
- 
-    logger.info(f"itemformat: {item_format}")
-    logger.info("Tryign to post item in mercadolibre..")    
-
-    try:
-        response = requests.post("https://api.mercadolibre.com/items", 
-                    json=item_format,
-                    headers={"Authorization": f"Bearer {token}"})
-        
-    except Exception as error:
-        logger.error(error)
-        return error
-    
-    if response.status_code in [200, 201]:
-        meli_id = response.json().get('id')
-        permalink = response.json().get('permalink')
-        logger.info(f"Publish of the item: {meli_id} successfully made.")
-        #setting description in mercadolibre
-        set_description(meli_id, item_data["description"], token)
-
-        #saving data in DB
-        item_metadata = {'meli_id': meli_id, 'permalink': permalink}
-        load_meli_data(item_data['id'], item_metadata)
-        return
-    
-
-
-    ####TRYING TO PUBLISH SECOND TIME####
-    else:
-        logger.warning(f"Failed to create item, response: {response.status_code}")
-        logger.info("using AI to publish item (using restricted scopes).")
-    
-        usr_prompt = f"""
-            ERROR_API: {response.status_code} - {response.json()}
-            PAYLOAD_ORIGINAL: {item_format}
-            REQUIRED_ATTRIBUTES: {required_attrs}"""
-
-        item_data_fix = call_ai(usr_prompt, PROMPT_SYS_MELI)
-
-        #Trying to publish the item now with AI correction.
-        item_data_fix=  ast.literal_eval(item_data_fix)
-        response = requests.post("https://api.mercadolibre.com/items", 
-                                 json=item_data_fix, 
-                                 headers={"Authorization": f"Bearer {token}"})
-
-        if response.status_code in [200, 201]:
-            meli_id = response.json().get('id')
-            permalink = response.json().get('permalink')
-            logger.info(f"Publish of the item: {meli_id} successfully made in the second try.")
-            #setting description in mercadolibre
-            set_description(meli_id, item_data["description"], token)
-            
-            #saving data in DB
-            item_metadata = {'meli_id': meli_id, 'permalink': permalink}
-            load_meli_data(item_data['id'], item_metadata)
             return
-        
-        else:
-            logger.error(f"Failed to create item, response: {response.status_code} \n {response.json()}")
-            usr_prompt = f"""ERROR AL INTENTAR PUBLICAR EL PRODUCTO A MERADOLIBRE: {response.status_code} - {response.json()}"""
-            message = call_ai(usr_prompt, PROMPT_FAILED)
-            item_metadata = {'status': 'no publicado','reason': message}
-            enviar_mensaje_whapi(TOKEN_WHAPI,PHONES, message)
-            load_failed_status(item_data['id'], item_metadata)
-            return
-
-
-
-
-###/////////////////////UPDATE EVENT///////////////////////////###
-def update_item(item_data, public_images, token):
-
-    meli_id = item_data['meli_id']
-
-    if meli_id is None:
-        logger.error(f"Item: {item_data['item_id']} doesnt exists in mercadolibre, nothing to update.")
-        return
-
-    price = float(item_data['price']) 
-    stock = item_data['stock'] 
-    description = item_data['description'] 
-
-    logger.info(f"Attempting to update Item: {meli_id} from mercadolibre..")
-
-
-    ####FIRST WE UPDATE ALL VALUES ALLOWED (except description)####
-    new_data = { "price": price, "available_quantity": stock, "pictures": public_images}
-
-    response = requests.put(f"https://api.mercadolibre.com/items/{meli_id}", 
-                            json=new_data, 
-                            headers={"Authorization": f"Bearer {token}"})
-
-    if response.status_code in [200, 201]:
-        ####UPDATING DESCRIPTION####
-        update_description(meli_id, description, token)
-        if item_reactivate(meli_id, token):
-            logger.info(f"Update of the item: {meli_id} successfully made.")
-            return
-    
-    else:
-        logger.error(f"Failed to update item: {meli_id} \n {response.json()}")
-        message = f"""Fallo la actualizacion del item {meli_id} en Mercadolibre. La respuesta fue:\n
-        {response.json()}"""
-        enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, message)
-        return
-        
-
-
-###/////////////////////PAUSED EVENT///////////////////////////###
-def pause_item(item_data, token):
-    """Changes item status to paused in Mercado Libre"""
-    meli_id = item_data['meli_id'] 
-
-    if meli_id is None:
-        logger.error(f"Item: {item_data['id']} doesnt exists in mercadolibre, nothing to pause.")
-        return
-
-    logger.info(f"Attempting to pause item: {meli_id}")
-    
-    try:
-        response = requests.put(
-            f"https://api.mercadolibre.com/items/{meli_id}", 
-            json={"status": "paused"},
-            headers={ "Authorization": f"Bearer {token}", "Content-Type": "application/json"})
-        
-        if response.status_code == 200:
-            logger.info(f"Item {meli_id} successfully paused (status: paused).")
-            return
-        else:
-            logger.error(f"Failed to pause item {meli_id}. Status: {response.status_code}, Error:\n {response.json()}")
-            enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, response.json())
-            return
-
-    except Exception as error:
-        logger.error(f"Unexpected error while pausing {meli_id}:\n {str(error)}")
-        enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, error)
-        return
