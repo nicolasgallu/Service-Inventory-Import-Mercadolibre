@@ -18,6 +18,13 @@ def publish_item(item_data, public_images, token):
             under this ID: {item_data['meli_id']} nothing to do.""")
         return
     
+    logger.info("checking if we already have title and description..")
+    if item_data["product_name_meli"] is None or item_data["description"] is None:
+        logger.error("theres missing values both in product name meli or description.")
+        item_metadata = {'status': 'no publicado','reason': 'Falta Nombre del Producto y/o Descripcion'}
+        load_failed_status(item_data['id'], item_metadata)
+        return
+    
     logger.info("checking if product accoumplish minimum price value..")    
     if item_data["price"] < 1000 or item_data["price"] is None:
         logger.error("Product Price < $1000")
