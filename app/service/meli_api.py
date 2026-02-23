@@ -141,7 +141,6 @@ def update_item(item_data, public_images, token):
     else:
         logger.info(f"Attempting to update Item: {meli_id} from mercadolibre..")
         new_data = { 
-             "title": item_data['product_name_meli'],
              "price": float(item_data['price']) , 
              "available_quantity": item_data['stock'] , 
              "pictures": public_images
