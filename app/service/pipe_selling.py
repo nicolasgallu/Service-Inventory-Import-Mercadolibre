@@ -5,6 +5,7 @@ from app.service.post_bitcram import post_sell
 from app.service.notifications import enviar_mensaje_whapi
 from app.settings.config import PHONES
 import requests
+import json
 
 def pipeline_selling(order_id):
     """"""
@@ -85,7 +86,7 @@ def pipeline_selling(order_id):
         created_at = order_data.get('date_created')
         order_items = order_data.get('order_items', [])
 
-        order = {'id':order_id,'data': order_items ,'created_at': created_at}
+        order = {'id':order_id,'data': json.dumps(order_items) ,'created_at': created_at}
         insert_order(order)
         
         #(using loop cause there can be multiple differents items in one single purcharse)
