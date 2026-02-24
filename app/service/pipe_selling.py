@@ -26,6 +26,9 @@ def pipeline_selling(order_id):
         #############################response = requests.get(url, headers=headers)
         #############################order_data = response.json()
 
+
+        logger.info("Order data succesfully getted..")
+
         order_data = {
             "id": 2000003508419013,
             "date_created": "2024-02-24T10:01:50.000-04:00",
@@ -87,10 +90,9 @@ def pipeline_selling(order_id):
         order_items = order_data.get('order_items', [])
 
         order = {'id':order_id,'data': json.dumps(order_items) ,'created_at': created_at}
-        #insert_order(order)
+        insert_order(order)
         
         #(using loop cause there can be multiple differents items in one single purcharse)
-        logger.info(f"data de la orden cruda: {order_data}")
         message= f'nueva orden generada\n {order_id}' 
         enviar_mensaje_whapi(token, PHONES, message)
         for item_info in order_items:
@@ -100,9 +102,11 @@ def pipeline_selling(order_id):
             data = get_bitcram_data(meli_id)
             id = data.get('id')
 
-            post_sell(id, quantity, unit_price)
+            post_sell(order_id, id, quantity, unit_price)
 
     except Exception as e:
         logger.error(f"Error processing the order: {e}")
+        message = f"fallo en la orden de meli: {order_id}"
+        enviar_mensaje_whapi(token, PHONES, message)
 
 

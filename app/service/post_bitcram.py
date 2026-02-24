@@ -1,27 +1,15 @@
 import requests
 import json
 from app.utils.logger import logger
-from app.settings.config import BASE_URL, CHECKOUT_NUMBER, PHONES, USERNAME, PASSWORD
+from app.settings.config import BASE_URL, CHECKOUT_NUMBER, PHONES, USERNAME, PASSWORD, TOKEN_WHAPI
 from app.service.notifications import enviar_mensaje_whapi
 from app.service.secrets import bitcram_secrets
 
 
-#TEMPORAL... solo para testear ventas
-resp = requests.post(
-    f"{BASE_URL}/api/auth/",
-    json={"username": USERNAME, "password": PASSWORD}
-)
-resp.raise_for_status()
-resp = resp.json()
-token = resp.get("token")
-
-
-
-
-def post_sell(target_product_id, quantity, price):
+def post_sell(order_id, target_product_id, quantity, price):
     #//////////////////////CHECKOUT//////////////////////
 
-    #token = bitcram_secrets() -----DESCOMENTAR
+    token = bitcram_secrets()
     headers = {"Authorization": f"Bearer {token}"}
     resp = requests.get(
         f"{BASE_URL}/api/checkouts/index",
@@ -44,10 +32,10 @@ def post_sell(target_product_id, quantity, price):
     price_list_id = checkout.get("price_list", {}).get("id")
     checkout_session_id = checkout.get("last_checkout_session", {}).get("id")
     is_open = checkout.get("is_open")
-    logger.info("Warehouse ID: ", warehouse_id)
-    logger.info("Price List ID: ", price_list_id)
-    logger.info("Checkout Session ID: ", checkout_session_id)
-    logger.info("Is Open: ", is_open)
+    logger.info(f"Warehouse ID: {warehouse_id}")
+    logger.info(f"Price List ID: {price_list_id}")
+    logger.info(f"Checkout Session ID: {checkout_session_id}")
+    logger.info(f"Is Open: {is_open}")
     if not is_open:
         logger.info(f"La caja número {CHECKOUT_NUMBER} está cerrada !!!")
         exit()  
@@ -64,7 +52,7 @@ def post_sell(target_product_id, quantity, price):
     if not checkout_session_accounts:
         raise Exception(f"No se encontraron cuentas para la sesión de caja número {checkout_session_id}")
     payment_type_id = checkout_session_accounts[0].get("checkout_account", {}).get("payment_type", {}).get("id")
-    logger.info("Payment Type ID: ", payment_type_id) 
+    logger.info(f"Payment Type ID: {payment_type_id}") 
 
     #//////////////////////LÓGICA DE STOCK BASADA EN TU FUNCIÓN GET_STOCK//////////////////////
     def consultar_stock_especifico(p_id, w_id, token_auth):
@@ -122,18 +110,20 @@ def post_sell(target_product_id, quantity, price):
         "payments": payment}    
 
     #//////////////////////EXECUTING POST EVENT//////////////////////
+    message_before = f"[STOCK] '{target_product_id}' antes de la venta: {stock_antes}"
     resp = requests.post(f"{BASE_URL}/api/commercial_docs/index", headers=headers, json=commercial_doc)
-    ## --- COMPROBACIÓN FINAL ---
-    resp.raise_for_status()
+    ## --- COMPROBACIÓN FINAL --- ##
     resp = resp.json()
+    logger.info(f"respuesta de bitcram: {resp}")
     commercial_doc_id = resp.get("id")
     commercial_doc_number = resp.get("commercial_doc_number")
-    logger.info("Commercial Doc Number: ", commercial_doc_number)
-    logger.info("Commercial Doc ID: ", commercial_doc_id)
+    logger.info(f"Commercial Doc Number: {commercial_doc_number}")
+    logger.info(f"Commercial Doc ID:  {commercial_doc_id}")
     stock_despues = consultar_stock_especifico(target_product_id, warehouse_id, token)
     message_before = f"[STOCK] '{target_product_id}' antes de la venta: {stock_antes}"
     message_after = f"[STOCK] '{target_product_id}' después de la venta: {stock_despues}"
     logger.info(message_before)  
     logger.info(message_after)
-    message_complete = message_before + '\n' + message_after
-    enviar_mensaje_whapi(token, PHONES, message_complete)
+    message_complete = resp + '\n' + 'meli_order_id:' + str(order_id) + '\n' + message_before + '\n' + message_after
+    enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, message_complete)
+
