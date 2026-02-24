@@ -104,11 +104,13 @@ def get_order(order_id):
                 WHERE id = {order_id};
             """)
         )
-        data = [dict(row) for row in result.mappings()][0]
-        if data:
-            return True
-        else:
-            return False
+    try:
+        # Intentamos obtener el primer elemento directamente
+        [dict(row) for row in result.mappings()][0]
+        return True
+    except IndexError:
+        # Si la lista estaba vacía, el índice [0] no existe y devuelve False
+        return False
 
 def insert_order(order):
     with engine.begin() as conn:
