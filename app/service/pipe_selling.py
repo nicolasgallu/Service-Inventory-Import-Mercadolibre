@@ -87,11 +87,11 @@ def pipeline_selling(order_id):
         order_items = order_data.get('order_items', [])
 
         order = {'id':order_id,'data': json.dumps(order_items) ,'created_at': created_at}
-        insert_order(order)
+        #insert_order(order)
         
         #(using loop cause there can be multiple differents items in one single purcharse)
         logger.info(f"data de la orden cruda: {order_data}")
-        message= f'nueva orden generada\n {order_data}' 
+        message= f'nueva orden generada\n {order_id}' 
         enviar_mensaje_whapi(token, PHONES, message)
         for item_info in order_items:
             meli_id = item_info.get('item', {}).get('id')
