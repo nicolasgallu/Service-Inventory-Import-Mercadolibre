@@ -3,7 +3,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 PROJECT_ID=os.getenv("PROJECT_ID")
-SECRET_ID=os.getenv("SECRET_ID")
+
+SECRET_MELI_ID=os.getenv("SECRET_MELI_ID")
+SECRET_BITCRAM_ID=os.getenv("SECRET_BITCRAM_ID")
 
 SECRET_GUIAS=os.getenv("SECRET_GUIAS")
 
@@ -29,6 +31,9 @@ WARRANTY_TIME=os.getenv("WARRANTY_TIME")
 
 ID_CARPETA_MADRE=os.getenv("ID_CARPETA_MADRE")
 BUCKET_NAME=os.getenv("BUCKET_NAME")
+
+BASE_URL=os.getenv("BASE_URL")
+CHECKOUT_NUMBER=os.getenv("CHECKOUT_NUMBER")
 
 #PROMPTS FOR AI HELPER (second try to publish item in Meli)
 PROMPT_SYS_MELI = """
@@ -68,3 +73,7 @@ PROMPT_FAILED="""
     SOLUCIÓN: [Instrucción operativa, ej: "Cargar EAN de 13 dígitos o poner N/A"]
     Prohibido: Saludos, introducciones, explicaciones técnicas del código (JSON, status codes) o despedidas.
     Si el error es sobre atributos, especifica cuál atributo falla."""
+
+
+USERNAME=os.getenv("USERNAME")
+PASSWORD=os.getenv("PASSWORD")

@@ -8,7 +8,6 @@ class MeliVenta():
     def __init__(self, access_token):
 
         self.base_url = "https://api.mercadolibre.com"
-        self.token =  "your token"
         self.header = {'Authorization': f'Bearer {access_token}', 'Content-type': 'application/json'}
 
     def create_users(self):
@@ -20,9 +19,16 @@ class MeliVenta():
         url = f'{self.base_url}/users/test_user'
         json = {"site_id":"MLA"}
         response = requests.post(url=url,headers=self.header,json=json).json()
-        email_test = response.get('email')
-        password = response.get('password')
-        return email_test, password
+        if response.get('code') == 'forbidden':
+
+            list_url = f'{self.base_url}/users/me/test_user'
+            list_response = requests.get(url=list_url, headers=self.header).json()
+            print(list_response)
+
+        else:
+            email_test = response.get('email')
+            password = response.get('password')
+            return email_test, password
 
     def _crate_test_user_token(self):
         print("Hello, Mercadolibre needs the following info in order to publicate the item in your user seller test account:\n")
@@ -62,6 +68,8 @@ class MeliVenta():
             "listing_type_id": "bronze",
             "condition": "new",
             "attributes": [
+                {"id": "SELLER_SKU", 
+                 "value_name": 43899},
                 {
                     "id": "BRAND",
                     "value_name": "Marca Genérica"
@@ -96,9 +104,9 @@ class MeliVenta():
             print(response.json())
     
 
-        
-token = 'your dev seller token'
+
+token = 'your tokens'
 Meli =  MeliVenta(token)
-#Meli.create_users()
+Meli.create_users()
 Meli.publicate_item_test()
 

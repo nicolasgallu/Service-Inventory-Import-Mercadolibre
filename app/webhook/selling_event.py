@@ -17,3 +17,4 @@ def main():
         # 2. Respondemos de inmediato
         # 202 significa "Accepted" (aceptado para procesamiento, pero no completado aún)
         return jsonify({"status": "accepted", "message": "Task dispatched to background"}), 202
+    

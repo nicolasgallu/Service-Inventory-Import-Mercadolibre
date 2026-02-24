@@ -97,9 +97,9 @@ def publish_item(item_data, public_images, token):
         item_metadata = {
             'meli_id': meli_id, 
             'permalink': permalink, 
-            'status': 'procesing..',
-            'reason': 'procesing..',
-            'remedy': 'procesing..',
+            'status': 'Procesando..',
+            'reason': 'Procesando..',
+            'remedy': 'Procesando..',
         }
         set_description(meli_id, item_data["description"], token)
         load_meli_data(item_data['id'], item_metadata)
@@ -131,9 +131,9 @@ def update_item(item_data, public_images, token):
         item_metadata = {
             'meli_id': None, 
             'permalink': None, 
-            'status': 'procesing..',
-            'reason': 'procesing..',
-            'remedy': 'procesing..',
+            'status': 'Procesando..',
+            'reason': 'Procesando..',
+            'remedy': 'Procesando..',
         }
         load_meli_data(item_data['id'], item_metadata)
         item_data['meli_id'] = None
@@ -210,9 +210,9 @@ def p_second_attempt(item_data, item_format, category_id, token, response):
         item_metadata = {
             'meli_id': meli_id, 
             'permalink': permalink, 
-            'status': 'procesing..',
-            'reason': 'procesing..',
-            'remedy': 'procesing..',
+            'status': 'Procesando..',
+            'reason': 'Procesando..',
+            'remedy': 'Procesando..',
         }
         set_description(meli_id, item_data["description"], token)
         load_meli_data(item_data['id'], item_metadata)
