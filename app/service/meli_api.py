@@ -25,9 +25,9 @@ def publish_item(item_data, public_images, token):
         load_failed_status(item_data['id'], item_metadata)
         return
     
-    logger.info("checking if product accoumplish minimum price value..")    
-    if item_data["price"] < 1000 or item_data["price"] is None:
-        logger.error("Product Price < $1000")
+    logger.info("checking if product accoumplish minimum price_mercadolibre value..")    
+    if item_data["price_mercadolibre"] < 1000 or item_data["price_mercadolibre"] is None:
+        logger.error("Product price_mercadolibre < $1000")
         item_metadata = {'status': 'no publicado','reason': 'precio del producto no cumple el minimo de MercadoLibre'}
         load_failed_status(item_data['id'], item_metadata)
         return
@@ -46,7 +46,7 @@ def publish_item(item_data, public_images, token):
     item_format = {
         "title": item_data["product_name_meli"], 
         "category_id": category_id, 
-        "price": float(item_data["price"]), 
+        "price_mercadolibre": float(item_data["price_mercadolibre"]), 
         "currency_id": CURRENCY, 
         "available_quantity": item_data["stock"],
         "buying_mode": BUY_MODE, 
@@ -115,8 +115,9 @@ def update_item(item_data, public_images, token):
     if meli_id is None or meli_id == '':
         logger.error(f"Item: {item_data['id']} doesnt exists in mercadolibre, nothing to update.")
         return
-    if item_data['price'] < 1000 or item_data['price'] is None:
-        logger.error("Product Price < $1000")
+
+    if item_data['price_mercadolibre'] < 1000 or item_data['price_mercadolibre'] is None:
+        logger.error("Product price_mercadolibre < $1000")
         item_metadata = {'status': 'no actualizado','reason': 'precio del producto no cumple el minimo de MercadoLibre'}
         load_failed_status(item_data['id'], item_metadata)
         return
@@ -138,10 +139,11 @@ def update_item(item_data, public_images, token):
         load_meli_data(item_data['id'], item_metadata)
         item_data['meli_id'] = None
         publish_item(item_data, public_images, token)
+
     else:
         logger.info(f"Attempting to update Item: {meli_id} from mercadolibre..")
         new_data = { 
-             "price": float(item_data['price']) , 
+             "price_mercadolibre": float(item_data['price_mercadolibre']) , 
              "available_quantity": item_data['stock'] , 
              "pictures": public_images
 
