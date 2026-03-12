@@ -224,8 +224,8 @@ def p_second_attempt(item_data, item_format, category_id, token, response):
         usr_prompt = f"""ERROR AL INTENTAR PUBLICAR EL PRODUCTO A MERADOLIBRE: {response.status_code} - {response.json()}"""
         message = call_ai(usr_prompt, PROMPT_FAILED)
         item_metadata = {'status': 'no publicado','reason': message}
-        enviar_mensaje_whapi(TOKEN_WHAPI,PHONES, message)
         load_failed_status(item_data['id'], item_metadata)
+        enviar_mensaje_whapi(TOKEN_WHAPI,PHONES, message)
         return
 
 def get_required_attributes(category_id, token):
