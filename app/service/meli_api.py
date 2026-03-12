@@ -46,7 +46,7 @@ def publish_item(item_data, public_images, token):
     item_format = {
         "title": item_data["product_name_meli"], 
         "category_id": category_id, 
-        "price_mercadolibre": float(item_data["price_mercadolibre"]), 
+        "price": float(item_data["price_mercadolibre"]), 
         "currency_id": CURRENCY, 
         "available_quantity": item_data["stock"],
         "buying_mode": BUY_MODE, 
@@ -143,7 +143,7 @@ def update_item(item_data, public_images, token):
     else:
         logger.info(f"Attempting to update Item: {meli_id} from mercadolibre..")
         new_data = { 
-             "price_mercadolibre": float(item_data['price_mercadolibre']) , 
+             "price": float(item_data['price_mercadolibre']) , 
              "available_quantity": item_data['stock'] , 
              "pictures": public_images
 
