@@ -5,8 +5,15 @@ from app.service.notifications import enviar_mensaje_whapi
 from app.service.database import load_meli_data, load_failed_status
 from app.service.bot import call_ai
 from app.settings.config import (
-    TOKEN_WHAPI, PHONES, CURRENCY, BUY_MODE, CONDITION, 
-    LISTING_TYPE, MODE, LOCAL_PICK_UP, FREE_SHIPPING, WARRANTY_TYPE, WARRANTY_TIME, PROMPT_SYS_MELI, PROMPT_FAILED)
+    TOKEN_WHAPI, PHONES, PROMPT_SYS_MELI, PROMPT_FAILED,
+    BUY_MODE, 
+    CONDITION, 
+    LISTING_TYPE, 
+    MODE, 
+    LOCAL_PICK_UP, 
+    FREE_SHIPPING, 
+    WARRANTY_TYPE, 
+    WARRANTY_TIME )
 
 
 def publish_item(item_data, public_images, token):
@@ -47,7 +54,7 @@ def publish_item(item_data, public_images, token):
         "title": item_data["product_name_meli"], 
         "category_id": category_id, 
         "price": float(item_data["price_mercadolibre"]), 
-        "currency_id": CURRENCY, 
+        "currency_id": 'ARS', 
         "available_quantity": item_data["stock"],
         "buying_mode": BUY_MODE, 
         "condition": CONDITION, 
@@ -340,3 +347,28 @@ def item_reactivate(meli_id, status, token):
             return
     else:
         return
+
+
+
+def get_selling_cost(category, price, logistic_type, listing_type, shipping_modes, 
+                     billable_weight, tags, token):
+    url = f"""
+        https://api.mercadolibre.com/sites/MLA/listing_prices?category_id={category}&
+        price={price}&cy_id=ARS&logistic_type={logistic_type}&shipping_modes={shipping_modes}&
+        listing_type_id={listing_type}&billable_weight={billable_weight}&tags={tags}"""
+    header = {'Authorization': f'Bearer {token}'}
+    response = requests.get(url=url,headers=header)
+    response = response.json()
+    return response
+
+def get_shipping_cost(category, price, logistic_type, listing_type, dimentions, free_shipping, 
+                      shipping_modes, condition, user_id, token):
+    url = f"""
+        https://api.mercadolibre.com/users/{user_id}/shipping_options/
+        free?dimensions={dimentions}&verbose=true&item_price={price}&category_id={category}&
+        listing_type_id={listing_type}&mode={shipping_modes}&condition={condition}&
+        logistic_type={logistic_type}&free_shipping={free_shipping}"""
+    header = {'Authorization': f'Bearer {token}'}
+    response = requests.get(url=url,headers=header)
+    response = response.json()
+    return response

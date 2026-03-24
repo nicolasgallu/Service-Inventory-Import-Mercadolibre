@@ -12,3 +12,4 @@ test_post_bitcram.py
 test.py
 test_wh_publications.py
 test_wh_sells.py
+test_selling_cost.py

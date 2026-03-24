@@ -19,7 +19,6 @@ NAME_DB=os.getenv("NAME_DB")
 TOKEN_WHAPI=os.getenv("TOKEN_WHAPI")
 PHONES=os.getenv("PHONES")
 
-CURRENCY=os.getenv("CURRENCY")
 BUY_MODE=os.getenv("BUY_MODE")
 CONDITION=os.getenv("CONDITION")
 LISTING_TYPE=os.getenv("LISTING_TYPE")

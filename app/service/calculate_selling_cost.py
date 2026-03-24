@@ -1,0 +1,1 @@
+from app.service.meli_api import get_category_id, get_selling_cost, get_shipping_cost
