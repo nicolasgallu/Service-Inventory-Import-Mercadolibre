@@ -13,20 +13,20 @@ def pipeline_publish(response):
         item_id = response['item_id']
         item_data = get_item_data(item_id)
         logger.info(f"Background Processing Event: {event_type} for ID: {item_id}")
+        token = meli_secrets()
         
         if event_type == "pre-publish":
             logger.info(response.get('data').get('field'))
             ai_call_prepublish(response, item_data)
 
+
         elif event_type == "delete":
             delete_item(item_data, token)
 
         elif event_type == "pause":
-            token = meli_secrets()
             pause_item(item_data, token)
 
         elif event_type in ["publish", "update"]:
-            token = meli_secrets()
             public_images = process_images_storage(item_id)
             if public_images == []:
                 logger.info("Public Images in Drive not founded, using image from Bitcram..")
