@@ -16,7 +16,7 @@ from app.settings.config import (
     WARRANTY_TIME )
 
 
-def publish_item(item_data, public_images, token):
+def publish_item(item_data:dict, public_images, token):
     """publish the item with a second try option"""
 
     logger.info("checking if product is already publish..")
@@ -32,8 +32,13 @@ def publish_item(item_data, public_images, token):
         load_failed_status(item_data['id'], item_metadata)
         return
     
-    logger.info("checking if product accoumplish minimum price_mercadolibre value..")    
-    if item_data["price_mercadolibre"] < 1000 or item_data["price_mercadolibre"] is None:
+    logger.info("checking if product accoumplish minimum price_mercadolibre value..")
+    
+    if item_data.get("price_mercadolibre") is not None:
+        price = item_data.get("price_mercadolibre")
+    else:
+        price = item_data.get("price")
+    if price is None or price < 1000:
         logger.error("Product price_mercadolibre < $1000")
         item_metadata = {'status': 'no publicado','reason': 'precio del producto no cumple el minimo de MercadoLibre'}
         load_failed_status(item_data['id'], item_metadata)
@@ -53,7 +58,7 @@ def publish_item(item_data, public_images, token):
     item_format = {
         "title": item_data["product_name_meli"], 
         "category_id": category_id, 
-        "price": float(item_data["price_mercadolibre"]), 
+        "price": float(price), 
         "currency_id": 'ARS', 
         "available_quantity": item_data["stock"],
         "buying_mode": BUY_MODE, 
@@ -123,7 +128,11 @@ def update_item(item_data, public_images, token):
         logger.error(f"Item: {item_data['id']} doesnt exists in mercadolibre, nothing to update.")
         return
 
-    if item_data['price_mercadolibre'] < 1000 or item_data['price_mercadolibre'] is None:
+    if item_data.get("price_mercadolibre") is not None:
+        price = item_data.get("price_mercadolibre")
+    else:
+        price = item_data.get("price")
+    if price is None or price < 1000:
         logger.error("Product price_mercadolibre < $1000")
         item_metadata = {'status': 'no actualizado','reason': 'precio del producto no cumple el minimo de MercadoLibre'}
         load_failed_status(item_data['id'], item_metadata)
@@ -150,7 +159,7 @@ def update_item(item_data, public_images, token):
     else:
         logger.info(f"Attempting to update Item: {meli_id} from mercadolibre..")
         new_data = { 
-             "price": float(item_data['price_mercadolibre']) , 
+             "price": float(price) , 
              "available_quantity": item_data['stock'] , 
              "pictures": public_images
 
