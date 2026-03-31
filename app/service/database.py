@@ -75,7 +75,7 @@ def load_failed_status(item_id, item_metadata):
 #LOGICA PARA ESCRIBIR MELI ID
 def load_meli_data(item_id, item_metadata):
     with engine.begin() as conn:
-        logger.info(f"Saving Meli ID & Permalink for item: {item_id}.")
+        logger.info(f"Saving Meli data: {item_id}.")
         conn.execute(
             text(f"""
                 UPDATE app_import.product_catalog_sync SET 

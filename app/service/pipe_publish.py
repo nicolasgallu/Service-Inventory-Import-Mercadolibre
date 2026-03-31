@@ -2,7 +2,7 @@ from app.service.secrets import meli_secrets
 from app.service.database import get_item_data
 from app.service.ai_completation import ai_call_prepublish
 from app.service.google_pictures import process_images_storage
-from app.service.meli_api import publish_item, update_item, pause_item
+from app.service.meli_api import publish_item, update_item, pause_item, delete_item
 from app.utils.logger import logger
 
 def pipeline_publish(response):
@@ -17,6 +17,9 @@ def pipeline_publish(response):
         if event_type == "pre-publish":
             logger.info(response.get('data').get('field'))
             ai_call_prepublish(response, item_data)
+
+        elif event_type == "delete":
+            delete_item(item_data, token)
 
         elif event_type == "pause":
             token = meli_secrets()

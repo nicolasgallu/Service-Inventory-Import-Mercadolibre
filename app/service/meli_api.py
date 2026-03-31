@@ -205,6 +205,35 @@ def pause_item(item_data, token):
         return
 
 
+def delete_item(item_data, token): 
+    meli_id = item_data['meli_id'] 
+    item_id = item_data['id']
+    if meli_id is None:
+        logger.error(f"Item: {item_data['id']} doesnt exists in mercadolibre, nothing to pause.")
+        return
+    
+    requests.put(
+            f"https://api.mercadolibre.com/items/{meli_id}", 
+            json={"status": "closed"},
+            headers={ "Authorization": f"Bearer {token}", "Content-Type": "application/json"})
+    
+    requests.put(
+            f"https://api.mercadolibre.com/items/{meli_id}", 
+            json={"deleted": "true"},
+            headers={ "Authorization": f"Bearer {token}", "Content-Type": "application/json"})
+    
+
+    item_metadata = {
+            'meli_id': None, 
+            'permalink': None, 
+            'status': None,
+            'reason': None,
+            'remedy': None,
+        }
+    load_meli_data(item_id, item_metadata)
+
+    logger.info("delete completed")
+
 
 def p_second_attempt(item_data, item_format, category_id, token, response):
     """AI modifies attributes in order to publish the product in meli"""
