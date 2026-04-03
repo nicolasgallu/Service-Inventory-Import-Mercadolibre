@@ -6,14 +6,19 @@ from app.service.database import load_meli_data, load_failed_status
 from app.service.bot import call_ai
 from app.settings.config import (
     TOKEN_WHAPI, PHONES, PROMPT_SYS_MELI, PROMPT_FAILED,
-    BUY_MODE, 
-    CONDITION, 
-    LISTING_TYPE, 
-    MODE, 
-    LOCAL_PICK_UP, 
-    FREE_SHIPPING, 
-    WARRANTY_TYPE, 
-    WARRANTY_TIME )
+    CURRENCY,
+    SITE,
+    CONDITION,
+    BUY_MODE,
+    BILLABLE_WEIGHT,
+    LISTING_TYPE,
+    TAGS,
+    SHIPPING_MODE,
+    LOGISTIC_TYPE,
+    LOCAL_PICK_UP,
+    FREE_SHIPPING,
+    WARRANTY_TYPE,
+    WARRANTY_TIME)
 
 
 def publish_item(item_data:dict, public_images, token):
@@ -73,7 +78,7 @@ def publish_item(item_data:dict, public_images, token):
             {"id": "UNITS_PER_PACK", "value_name": "1"}
         ],
         "shipping": { 
-            "mode": MODE, 
+            "mode": SHIPPING_MODE, 
             "local_pick_up": LOCAL_PICK_UP,
             "free_shipping": FREE_SHIPPING 
         },
@@ -388,25 +393,50 @@ def item_reactivate(meli_id, status, token):
 
 
 
-def get_selling_cost(category, price, logistic_type, listing_type, shipping_modes, 
-                     billable_weight, tags, token):
-    url = f"""
-        https://api.mercadolibre.com/sites/MLA/listing_prices?category_id={category}&
-        price={price}&cy_id=ARS&logistic_type={logistic_type}&shipping_modes={shipping_modes}&
-        listing_type_id={listing_type}&billable_weight={billable_weight}&tags={tags}"""
-    header = {'Authorization': f'Bearer {token}'}
-    response = requests.get(url=url,headers=header)
-    response = response.json()
-    return response
+def get_selling_cost(item_data:dict, category_id, token):
+    """Calculate the cost for selling in mercadolibre.
+    Input: item data {price|price_mercadolibre, dimentions}, user_id (meli user id) and token (meli token)"""
+    
+    logger.info("Calling selling cost.")
+    if item_data.get("price_mercadolibre") is not None:
+        price = item_data.get("price_mercadolibre")
+    else:
+        price = item_data.get("price")
 
-def get_shipping_cost(category, price, logistic_type, listing_type, dimentions, free_shipping, 
-                      shipping_modes, condition, user_id, token):
     url = f"""
-        https://api.mercadolibre.com/users/{user_id}/shipping_options/
-        free?dimensions={dimentions}&verbose=true&item_price={price}&category_id={category}&
-        listing_type_id={listing_type}&mode={shipping_modes}&condition={condition}&
-        logistic_type={logistic_type}&free_shipping={free_shipping}"""
+        https://api.mercadolibre.com/sites/{SITE}/listing_prices?category_id={category_id}&price={price}&cy_id={CURRENCY}&logistic_type={LOGISTIC_TYPE}&shipping_modes={SHIPPING_MODE}&listing_type_id={LISTING_TYPE}&billable_weight={BILLABLE_WEIGHT}&tags={TAGS}"""
     header = {'Authorization': f'Bearer {token}'}
     response = requests.get(url=url,headers=header)
     response = response.json()
-    return response
+    cost_detail = {
+        'sale_fee_amount':response['sale_fee_amount'], 
+        'fixed_fee': response['sale_fee_details']['fixed_fee'], 
+        'financing_add_on_fee': response['sale_fee_details']['financing_add_on_fee'], 
+        'meli_percentage_fee': response['sale_fee_details']['meli_percentage_fee'],
+        'percentage_fee': response['sale_fee_details']['percentage_fee'],
+        'gross_amount': response['sale_fee_details']['gross_amount'],
+        'listing_fixed_fee':response['listing_fee_details']['fixed_fee'], 
+        'listing_gross_amount':response['listing_fee_details']['gross_amount'], 
+    }
+
+    return cost_detail
+
+
+def get_shipping_cost(cost_detail, item_data:dict, category_id, user_id, token):
+
+    logger.info("Calling shipping cost.")
+    if item_data.get("price_mercadolibre") is not None:
+        price = item_data.get("price_mercadolibre")
+    else:
+        price = item_data.get("price")
+    dimentions = item_data.get('dimentions')
+
+    url = f"""
+        https://api.mercadolibre.com/users/{user_id}/shipping_options/free?dimensions={dimentions}&verbose=true&item_price={price}&category_id={category_id}&listing_type_id={LISTING_TYPE}&mode={SHIPPING_MODE}&condition={CONDITION}&logistic_type={LOGISTIC_TYPE}&free_shipping={FREE_SHIPPING}"""
+    header = {'Authorization': f'Bearer {token}'}
+    response = requests.get(url=url,headers=header)
+    response = response.json()
+    cost_detail['ship_cost_amount']= response['coverage']['all_country']['list_cost']
+    cost_detail['ship_discount']= response['coverage']['all_country']['discount']['rate']
+    cost_detail['ship_cost_full_amount']=response['coverage']['all_country']['discount']['promoted_amount']
+    return cost_detail

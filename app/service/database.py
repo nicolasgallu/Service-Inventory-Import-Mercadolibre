@@ -43,7 +43,62 @@ def get_item_data(item_id):
         else:
             logger.info("Data extraction failed.")
             return None
-        
+
+
+def load_selling_calculation(cost_detail):
+    """writting field description or title using ai reply,
+    this is part from the pre-publish event."""
+    with engine.begin() as conn:
+        logger.info(f"Saving cost calculation.")
+        conn.execute(
+            text(f"""
+                INSERT INTO mercadolibre.selling_calculation (
+                  item_id,
+                  category_id,
+                  sale_fee_amount,
+                  fixed_fee,
+                  financing_add_on_fee,
+                  meli_percentage_fee,
+                  percentage_fee,
+                  gross_amount,
+                  listing_fixed_fee,
+                  listing_gross_amount,
+                  ship_cost_amount,
+                  ship_discount,
+                  ship_cost_full_amount,
+                  total_selling_cost)
+
+                VALUES (
+                    :item_id,
+                    :category_id,
+                    :sale_fee_amount,
+                    :fixed_fee,
+                    :financing_add_on_fee,
+                    :meli_percentage_fee,
+                    :percentage_fee,
+                    :gross_amount,
+                    :listing_fixed_fee,
+                    :listing_gross_amount,
+                    :ship_cost_amount,
+                    :ship_discount,
+                    :ship_cost_full_amount,
+                    :ship_cost_amount + :sale_fee_amount) ON DUPLICATE KEY UPDATE
+                category_id= :category_id,
+                sale_fee_amount= :sale_fee_amount,
+                fixed_fee= :fixed_fee,
+                financing_add_on_fee= :financing_add_on_fee,
+                meli_percentage_fee= :meli_percentage_fee,
+                percentage_fee= :percentage_fee,
+                gross_amount= :gross_amount,
+                listing_fixed_fee= :listing_fixed_fee,
+                listing_gross_amount= :listing_gross_amount,
+                ship_cost_amount= :ship_cost_amount,
+                ship_discount= :ship_discount,
+                ship_cost_full_amount= :ship_cost_full_amount,
+                total_selling_cost= :ship_cost_amount + :sale_fee_amount
+            """),cost_detail) 
+        logger.info("Load Completed.")
+
 
 def load_ai_response(item_id, field ,ai_response):
     """writting field description or title using ai reply,
