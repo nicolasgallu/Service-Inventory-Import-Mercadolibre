@@ -10,7 +10,7 @@ def ai_call_prepublish(event_data, item_data):
     item_id = item_data.get('id')
     title = item_data.get('product_name')
     brand = item_data.get('brand')
-    dimention = item_data.get('dimention','')
+    dimention = item_data.get('dimentions','')
 
     field = event_data.get('data').get('field')
     user_prompt = event_data.get('data').get('prompt')
