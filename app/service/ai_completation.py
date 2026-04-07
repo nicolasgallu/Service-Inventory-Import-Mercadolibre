@@ -41,6 +41,7 @@ def ai_call_prepublish(event_data, item_data):
             **Contexto de la tarea:**
             1. Si no existe una descripción previa 'prev_data', genera el contenido desde cero siguiendo las reglas generales.
             2. Si ya existe una descripción previa 'prev_data', tu objetivo es actuar sobre el feedback del usuario para modificar y mejorar el resultado anterior, manteniendo siempre la coherencia con las reglas.
+            3. Vas a recibir el dato de "dimentions" para agregar a la descripcion, puede venir null, (el formato en el que viene es el siguiente ejemplo: 15x20x30,1500 "altura","ancho","largo" y "peso en gramos").
 
             **Reglas importantes:**
             1. *No inventes información:* No menciones materiales, dimensiones, colores u origen a menos que estén en el nombre del producto.
@@ -51,7 +52,7 @@ def ai_call_prepublish(event_data, item_data):
             **Datos:**
             - Nombre del producto: {title}
             - prev_data (contexto para cambios): {prev_data}
-            - Dimentions:{dimention}
+            - Dimentions:{dimention} 
             """
 
 
