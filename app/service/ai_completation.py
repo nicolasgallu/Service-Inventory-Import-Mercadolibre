@@ -8,16 +8,17 @@ def ai_call_prepublish(event_data, item_data):
     """generates description/title and if is not already made the brand."""
     
     item_id = item_data.get('id')
-    title = item_data.get('product_name')
-    brand = item_data.get('brand')
-    dimention = item_data.get('dimentions','')
+    title = item_data.get('product_name',None)
+    brand = item_data.get('brand', None)
+    model = item_data.get('model', None)
+    dimention = item_data.get('dimentions',None)
 
     field = event_data.get('data').get('field')
     user_prompt = event_data.get('data').get('prompt')
 
     if field == 'product_name_meli':
         logger.info("the request is for creating the title")
-        prev_data = item_data.get('product_name_meli')
+        prev_data = item_data.get('product_name_meli', None)
         sys_prompt = f"""
             Tu tarea es crear un título optimizado para Mercado Libre basándote ESTRICTA Y ÚNICAMENTE en el nombre del producto proporcionado, genera
             un titulo atractivo ya que vas a recibir el nombre original y normalmente suele no ser tan llamativo para vender.
@@ -27,7 +28,9 @@ def ai_call_prepublish(event_data, item_data):
             2. Si ya existe un título previo 'prev_data', tu objetivo es aplicar el feedback del usuario para refinarlo, manteniendo la estructura de venta.
         
             **Reglas de optimización (Meli):**
-            4. *Formato de salida:* Devuelve EXCLUSIVAMENTE el texto del título. No incluyas comillas, comentarios, etiquetas de markdown ni introducciones.
+            1. *Formato de salida:* Devuelve EXCLUSIVAMENTE el texto del título. No incluyas comillas, comentarios, etiquetas de markdown ni introducciones.
+            2. *Limited de Caracteres*: Mantenete siempre en un rango inferior a 60 caracteres.
+
         
             **Datos:**
             - Nombre original del producto: {title}
@@ -76,9 +79,7 @@ def ai_call_prepublish(event_data, item_data):
     load_ai_response(item_id, field, ai_response)
 
 
-    if brand:
-        None
-    else:
+    if not brand:
         logger.info("Autocompleting Brand")
         user_prompt = f"el nombre del producto del cual necesito la marca es este: {title}"
         sys_prompt = """
@@ -108,4 +109,33 @@ def ai_call_prepublish(event_data, item_data):
         load_ai_response(item_id, 'brand', ai_response)
 
 
+    if not model:
+        logger.info("Autocompleting Model")
+        user_prompt = f"El nombre del producto del cual necesito extraer el modelo es este: {title}"
 
+        sys_prompt = """
+            Tu tarea es identificar el MODELO específico de un producto basándote en su nombre comercial.
+            Reglas estrictas:
+            1. Extrae únicamente el modelo (ej. 'S23 Ultra', 'M407', 'WH-1000XM5').
+            2. No incluyas la marca en el resultado, a menos que la marca sea parte integral del nombre del modelo.
+            3. Prioriza códigos alfanuméricos, versiones (Pro, Max, Lite) o nombres específicos de la serie.
+            4. Si el nombre del producto NO contiene un modelo explícito, responde ÚNICAMENTE con la palabra: 'No definido'.
+            5. No añadas explicaciones, introducciones ni texto adicional. Solo el nombre del modelo.
+            6. Si el título incluye el modelo y también el año de la versión (ej. 'Modelo 2024'), inclúyelo si ayuda a diferenciar el producto.
+        """
+        payload = {
+            "model": "deepseek-chat",
+            "messages": [
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+            "max_tokens": 1000,
+            "temperature": 0.55
+        }       
+        headers = {
+            "Authorization": f"Bearer {DS_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        response = requests.post("https://api.deepseek.com/v1/chat/completions", headers=headers, json=payload)
+        ai_response = {'ai_response' : response.json()['choices'][0]['message']['content']}
+        load_ai_response(item_id, 'model', ai_response)

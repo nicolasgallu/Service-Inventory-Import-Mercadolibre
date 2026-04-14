@@ -38,7 +38,6 @@ def publish_item(item_data:dict, public_images, token):
         return
     
     logger.info("checking if product accoumplish minimum price_mercadolibre value..")
-    
     if item_data.get("price_mercadolibre") is not None:
         price = item_data.get("price_mercadolibre")
     else:
@@ -57,30 +56,30 @@ def publish_item(item_data:dict, public_images, token):
             'reason': 'Mercadolibre no logro crear un category ID, se recomienda modificar el titulo u intentar publicar manualmente.'}
         load_failed_status(item_data['id'], item_metadata)
         return
+    logger.info(f"the category selelcted {category_id}")
     
     logger.info("Attempting to publish the product in mercadolibre..")
-
     item_format = {
         "title": item_data["product_name_meli"], 
         "category_id": category_id, 
         "price": float(price), 
         "currency_id": 'ARS', 
-        "available_quantity": item_data["stock"],
+        "available_quantity": item_data.get('stock', 0),
         "buying_mode": BUY_MODE, 
         "condition": CONDITION, 
-        "listing_type_id": LISTING_TYPE,
+        "listing_type_id": item_data.get('listing_type_id', 'gold_special'),
         "pictures": public_images, 
         "attributes": [
-            {"id": "BRAND", "value_name": item_data["brand"]},
-            {"id": "MODEL", "value_name": None},
+            {"id": "BRAND", "value_name": item_data.get('brand', None)},
+            {"id": "MODEL", "value_name": item_data.get('model', None)},
             {"id": "VALUE_ADDED_TAX", "value_id": "48405909"},#48405909 es el 21% 55043032 excento y 48405907 es 0%
             {"id": "IMPORT_DUTY", "value_id": "49553239"}, #49553239 es 0
             {"id": "UNITS_PER_PACK", "value_name": "1"}
         ],
         "shipping": { 
-            "mode": SHIPPING_MODE, 
+            "mode": item_data.get('mode_shipping', 'me2'), 
             "local_pick_up": LOCAL_PICK_UP,
-            "free_shipping": FREE_SHIPPING 
+            "free_shipping": item_data.get('free_shipping', 'False') 
         },
         "sale_terms": [
             {"id": "WARRANTY_TYPE", "value_name": WARRANTY_TYPE}, 
@@ -128,15 +127,18 @@ def publish_item(item_data:dict, public_images, token):
     
 def update_item(item_data, public_images, token):
     """Update MercadoLibre item"""
+
     meli_id = item_data['meli_id']
+
     if meli_id is None or meli_id == '':
         logger.error(f"Item: {item_data['id']} doesnt exists in mercadolibre, nothing to update.")
         return
-
+    
     if item_data.get("price_mercadolibre") is not None:
         price = item_data.get("price_mercadolibre")
     else:
         price = item_data.get("price")
+
     if price is None or price < 1000:
         logger.error("Product price_mercadolibre < $1000")
         item_metadata = {'status': 'no actualizado','reason': 'precio del producto no cumple el minimo de MercadoLibre'}
@@ -160,29 +162,37 @@ def update_item(item_data, public_images, token):
         load_meli_data(item_data['id'], item_metadata)
         item_data['meli_id'] = None
         publish_item(item_data, public_images, token)
+        return
 
-    else:
-        logger.info(f"Attempting to update Item: {meli_id} from mercadolibre..")
-        new_data = { 
-             "price": float(price) , 
-             "available_quantity": item_data['stock'] , 
-             "pictures": public_images
-
+    new_data = {
+        "title": item_data["product_name_meli"], 
+        "price": float(price), 
+        "pictures": public_images, 
+        "attributes": [
+            {"id": "BRAND", "value_name": item_data.get('brand', None)},
+            {"id": "MODEL", "value_name": item_data.get('model', None)}
+        ],
+        "shipping": { 
+            "mode": item_data.get('mode_shipping', 'me2'), 
+            "free_shipping": item_data.get('free_shipping', 'False') 
         }
-        response = requests.put(f"https://api.mercadolibre.com/items/{meli_id}", 
-                                json=new_data, 
-                                headers={"Authorization": f"Bearer {token}"})
+    }
 
-        if response.status_code in [200, 201]:
-            set_description(meli_id, item_data['description'] , token, update=True)
-            item_reactivate(meli_id, status, token)
-            return
-        else:
-            logger.error(f"Failed to update item: {meli_id} \n {response.json()}")
-            message = f"""Fallo la actualizacion del item {meli_id} en Mercadolibre. La respuesta fue:\nÑ
-            {response.json()}"""
-            enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, message)
-            return
+    sold_quantity = get_item_sales(meli_id, token)
+    if sold_quantity > 0:
+        logger.info(f"Item: {meli_id} has one sell or more.")
+        del new_data["attributes"]
+        del new_data["title"]
+        update_body(meli_id, item_data, new_data, status, token)
+    else:
+        logger.info(f"Item: {meli_id} has no sells.")
+        update_body(meli_id, item_data, new_data, status, token)
+        response = requests.put(f"https://api.mercadolibre.com/items/{meli_id}/listing_type", 
+                                data={"id":item_data.get('listing_type_id')}, 
+                                headers={"Authorization": f"Bearer {token}"})
+        logger.info(response.json())
+        logger.info(response)
+
         
 def pause_item(item_data, token):
     """Changes item status to paused in Mercado Libre"""
@@ -214,7 +224,7 @@ def delete_item(item_data, token):
     meli_id = item_data['meli_id'] 
     item_id = item_data['id']
     if meli_id is None:
-        logger.error(f"Item: {item_data['id']} doesnt exists in mercadolibre, nothing to pause.")
+        logger.error(f"Item: {item_data['id']} doesnt exists in mercadolibre, nothing to delete.")
         return
     
     requests.put(
@@ -390,6 +400,36 @@ def item_reactivate(meli_id, status, token):
             return
     else:
         return
+    
+
+def update_body(meli_id, item_data, new_data, status, token):
+    logger.info(f"Attempting to update Item: {meli_id} on mercadolibre..")
+    response = requests.put(f"https://api.mercadolibre.com/items/{meli_id}", 
+                            json=new_data, 
+                            headers={"Authorization": f"Bearer {token}"})
+    if response.status_code in [200, 201]:
+        set_description(meli_id, item_data['description'] , token, update=True)
+        item_reactivate(meli_id, status, token)
+        return
+    else:
+        logger.error(f"Failed to update item: {meli_id} \n {response.json()}")
+        message = f"""Fallo la actualizacion del item {meli_id} en Mercadolibre. La respuesta fue:\nÑ
+        {response.json()}"""
+        enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, message)
+        return
+
+def get_item_sales(meli_id, access_token):
+    """"""
+    logger.info(f"getting total sells from item: {meli_id}")
+    url = f"https://api.mercadolibre.com/items/{meli_id}"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        data = response.json()
+        sold_quantity = data.get("sold_quantity")
+        return sold_quantity
+    else:
+        return f"Error: {response.status_code} - {response.text}"
 
 
 
@@ -420,7 +460,6 @@ def get_selling_cost(item_data:dict, category_id, token):
     }
 
     return cost_detail
-
 
 def get_shipping_cost(cost_detail, item_data:dict, category_id, user_id, token):
 

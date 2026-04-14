@@ -139,7 +139,6 @@ def load_meli_data(item_id, item_metadata):
                  status = :status,
                  reason = :reason,
                  remedy = :remedy
-
                 WHERE id = {item_id}
             """),item_metadata) 
         logger.info("Load Completed.")
