@@ -12,6 +12,7 @@ def pipeline_publish(response):
         event_type = response['event_type']
         item_id = response['item_id']
         item_data = get_item_data(item_id)
+        logger.info(f"log auxiliar: meli id:: {item_data['meli_id']}")
         logger.info(f"Background Processing Event: {event_type} for ID: {item_id}")
         token = meli_secrets()
         
