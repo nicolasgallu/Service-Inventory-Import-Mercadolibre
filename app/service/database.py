@@ -2,6 +2,7 @@ from sqlalchemy import create_engine, text
 from google.cloud.sql.connector import Connector
 from app.settings.config import INSTANCE_DB, USER_DB, PASSWORD_DB, NAME_DB
 from app.utils.logger import logger
+from datetime import datetime
 
 ##!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ##CAMBIAR ESQUEMAS FIJOS A PARAMETROS 
@@ -25,6 +26,7 @@ engine = create_engine(
         pool_size=5,
         max_overflow=2,
     )
+
 
 def get_item_data(item_id):
     """"""
