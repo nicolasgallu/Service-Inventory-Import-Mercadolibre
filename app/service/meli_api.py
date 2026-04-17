@@ -166,7 +166,8 @@ def update_item(item_data, public_images, token):
 
     new_data = {
         "title": item_data["product_name_meli"], 
-        "price": float(price), 
+        "price": float(price),
+        "available_quantity": item_data.get('stock', 0),
         "pictures": public_images, 
         "attributes": [
             {"id": "BRAND", "value_name": item_data.get('brand', None)},
