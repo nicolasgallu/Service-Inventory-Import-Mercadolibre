@@ -23,12 +23,11 @@ def aux_format_data(item_id, public_images):
         
     def _aux_dimentions(data):
         dimentions = data.get("dimentions", None)
-        logger.info(f"dimentions: {dimentions}")
         if dimentions:
             dimentions = dimentions.split("x")
-            height = dimentions[0]
-            width = dimentions[1]
-            depth = dimentions[2].split(',')[0]
+            height = int(dimentions[0])
+            width = int(dimentions[1])
+            depth = int(dimentions[2].split(',')[0])
             weight = int(dimentions[2].split(',')[1])/1000
             dimtions_norm = {
                 "height":height,
@@ -36,6 +35,7 @@ def aux_format_data(item_id, public_images):
                 "depth":depth,
                 "weight":weight,
             }
+            logger.info(f"dimentions: {dimtions_norm}")
             return dimtions_norm
         else:
             logger.info("bad dimention")
@@ -64,13 +64,14 @@ def aux_format_data(item_id, public_images):
         {
         "price": _aux_cast(data.get("price_tienda_nube", 0)),
         "promotional_price": _aux_cast(data.get("promotional_price", 0)),
-        "stock": _aux_cast(data.get("stock", 0)),
+        #"stock": _aux_cast(data.get("stock", 0)),
+        "stock": 100,
         "sku": data.get("sku", None),
         "barcode": data.get("barcode", None),
-        "weight": _aux_cast(dimtions_norm.get("weight", 0)),
-        "width": _aux_cast(dimtions_norm.get("width", 0)),
-        "height": _aux_cast(dimtions_norm.get("height", 0)),
-        "depth": _aux_cast(dimtions_norm.get("depth", 0)),
+        "weight": dimtions_norm.get("weight", 0),
+        "width": dimtions_norm.get("width", 0),
+        "height": dimtions_norm.get("height", 0),
+        "depth": dimtions_norm.get("depth", 0),
         "cost": _aux_cast(data.get("cost", 0)),
         "mpn": data.get("mpn", None),
         "age_group": data.get("age_group", None),
@@ -93,7 +94,7 @@ def tienda_nube_publish_item(item_id, public_images):
     
     else:
         url_base, headers = aux_base_url()
-        product_data['variant'] = variant_data
+        product_data['variants'] = variant_data
         response = requests.post(url_base, headers=headers, data=json.dumps(product_data))
         if response.status_code == 201:
             logger.info("product correctly published!")
@@ -136,6 +137,7 @@ def tienda_nube_update_item(item_id, public_images):
     images = product_data.pop('images')
     url_upd_product = f"{url_base}/{product_id}"
     url_upd_variant = f"{url_upd_product}/variants/{variant_id}"
+    logger.info(f"variant url to update is: {url_upd_variant}")
     url_upd_image = f"{url_upd_product}/images"
 
     response = requests.put(url_upd_product, headers=headers, data=json.dumps(product_data))
