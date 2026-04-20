@@ -23,6 +23,7 @@ def aux_format_data(item_id, public_images):
         
     def _aux_dimentions(data):
         dimentions = data.get('dimentions',None)
+        logger.info(dimentions)
         if dimentions:
             dimentions = dimentions.split("x")
             height = dimentions[0]
@@ -37,6 +38,7 @@ def aux_format_data(item_id, public_images):
             }
             return dimtions_norm
         else:
+            logger.info("bad dimention")
             return {}
         
     data = get_tienda_nube_item_data(item_id)
