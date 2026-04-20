@@ -28,6 +28,94 @@ engine = create_engine(
     )
 
 
+
+def get_tienda_nube_item_data(item_id):
+    """"""
+    with engine.begin() as conn:
+        logger.info(f"Extracting data from item: {item_id}.")
+        result = conn.execute(
+            text(f"""
+                SELECT 
+                 a.*,
+                 b.*,
+                 c.product_id,
+                 c.variant_id FROM app_import.product_catalog_sync as a
+                LEFT JOIN (
+                SELECT 
+                    id as attribute_id,
+                    item_id,
+                    seo_title,
+                    seo_description,
+                    barcode,
+                    video_url,
+                    tags,
+                    promotional_price,
+                    mpn,
+                    age_group,
+                    gender
+                FROM tienda_nube.attributes) as b ON a.id = b.item_id 
+                
+                LEFT JOIN (
+                SELECT
+                    attribute_id,
+                    product_id,
+                    variant_id
+                FROM 
+                    tienda_nube.product_status) as c ON b.attribute_id = c.attribute_id
+                
+                WHERE a.id = {item_id};
+            """)
+        )
+        data = [dict(row) for row in result.mappings()][0]
+        if data:
+            logger.info("Data extraction completed.")
+            return data
+        else:
+            logger.info("Data extraction failed.")
+            return None
+
+def load_tienda_nube_product_status(data):
+    """writting field description or title using ai reply,
+    this is part from the pre-publish event."""
+    with engine.begin() as conn:
+        logger.info(f"Saving tienda nube product status.")
+        conn.execute(
+            text(f"""
+                INSERT INTO tienda_nube.product_status (
+                attribute_id,
+                product_id,
+                variant_id,
+                response,
+                updated_at)
+                VALUES (
+                :attribute_id,
+                :product_id,
+                :variant_id,
+                :response,
+                :updated_at) ON DUPLICATE KEY UPDATE
+                product_id = :product_id,
+                variant_id = :variant_id,
+                response = :response,
+                updated_at = :updated_at
+            """),data) 
+        logger.info("Load Completed.")
+
+
+def delete_tienda_nube_product_status(data):
+    """writting field description or title using ai reply,
+    this is part from the pre-publish event."""
+    with engine.begin() as conn:
+        logger.info(f"Deleting tienda nube product status.")
+        conn.execute(
+            text(f"""
+                delete from tienda_nube.product_status
+                where attribute_id = :attribute_id
+            """),data) 
+        logger.info("delete completed.")
+
+
+
+
 def get_item_data(item_id):
     """"""
     with engine.begin() as conn:
