@@ -1,4 +1,5 @@
 from app.service.database import get_tienda_nube_item_data,load_tienda_nube_product_status,delete_tienda_nube_product_status
+from app.service.google_pictures import process_images_storage
 from app.service.secrets import tienda_nube_secrets
 import requests
 import json
@@ -13,7 +14,7 @@ def aux_base_url():
         "Content-Type": "application/json"}
     return url_base, headers
 
-def aux_format_data(item_id, public_images):
+def aux_format_data(item_id):
 
     def _aux_cast(value):
         if value is None:
@@ -44,6 +45,15 @@ def aux_format_data(item_id, public_images):
     attribute_id = data.get("attribute_id")
     product_id = data.get("product_id", None)
     variant_id = data.get("variant_id", None)
+
+    public_images = process_images_storage(item_id)
+    if public_images == []:
+        logger.info("Public Images in Drive not founded, using image from Bitcram..")
+        public_images = [{'src': data["product_image_b_format_url"]}]
+    else:
+        for i in public_images:
+            i['src'] = i['source']
+            i.pop('source')
 
     product_data = {
         "name": {"es": data.get("product_name_meli", None)},
@@ -80,10 +90,10 @@ def aux_format_data(item_id, public_images):
 
 ##==========================PUBLISH=================================##
 
-def tienda_nube_publish_item(item_id, public_images):
+def tienda_nube_publish_item(item_id):
     
     logger.info("publish process started")
-    product_data, variant_data, attribute_id, product_id, variant_id = aux_format_data(item_id, public_images)
+    product_data, variant_data, attribute_id, product_id, variant_id = aux_format_data(item_id)
 
     if product_id:
         logger.info("product already published, nothing to do.")
@@ -118,11 +128,11 @@ def tienda_nube_publish_item(item_id, public_images):
 
 ##==========================UPDATE=================================##
 
-def tienda_nube_update_item(item_id, public_images):
+def tienda_nube_update_item(item_id):
     
     logger.info("update process started")
     url_base, headers = aux_base_url()
-    product_data, variant_data, attribute_id, product_id, variant_id = aux_format_data(item_id, public_images)
+    product_data, variant_data, attribute_id, product_id, variant_id = aux_format_data(item_id)
     update_response = {
         "attribute_id": attribute_id,
         "product_id": product_id, 

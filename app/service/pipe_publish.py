@@ -13,33 +13,20 @@ def pipeline_publish(response):
     item_id = response['item_id']
     
     if response['site'] == 'tienda-nube':
-        
+        logger.info("TiendaNube Product Notification")        
         if event_type == "delete":
             tienda_nube_delete_item(item_id)
-
-        elif event_type in ["publish", "update"]:
-            public_images = process_images_storage(item_id)
-            if public_images == []:
-                logger.info("Public Images in Drive not founded, using image from Bitcram..")
-                public_images = [{'src': item_data["product_image_b_format_url"]}]
-            else:
-                for i in public_images:
-                    i['src'] = i['source']
-                    i.pop('source')
-
-            if event_type == "publish":
-                tienda_nube_publish_item(item_id, public_images)
-
-            elif event_type == "update":
-                tienda_nube_update_item(item_id, public_images)
-                None
+        elif event_type == "publish":
+            tienda_nube_publish_item(item_id)
+        elif event_type == "update":
+            tienda_nube_update_item(item_id)
+        return
 
     else:
 
         try:
+            logger.info("Meli Product Notification")
             item_data = get_item_data(item_id)
-            logger.info(f"log auxiliar: meli id:: {item_data['meli_id']}")
-            logger.info(f"Background Processing Event: {event_type} for ID: {item_id}")
             token = meli_secrets()
 
             if event_type == "pre-publish":
