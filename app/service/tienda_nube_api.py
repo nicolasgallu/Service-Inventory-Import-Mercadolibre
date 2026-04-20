@@ -22,8 +22,8 @@ def aux_format_data(item_id, public_images):
             return int(value)
         
     def _aux_dimentions(data):
-        dimentions = data.get('dimentions',None)
-        logger.info(dimentions)
+        dimentions = data.get("dimentions", None)
+        logger.info(f"dimentions: {dimentions}")
         if dimentions:
             dimentions = dimentions.split("x")
             height = dimentions[0]
