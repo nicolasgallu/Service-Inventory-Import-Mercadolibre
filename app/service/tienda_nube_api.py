@@ -3,6 +3,7 @@ from app.service.secrets import tienda_nube_secrets
 import requests
 import json
 from datetime import datetime
+from app.utils.logger import logger
 
 def aux_base_url():
     token, user_id = tienda_nube_secrets()
@@ -60,11 +61,12 @@ def aux_format_data(item_id, public_images):
 ##==========================PUBLISH=================================##
 
 def tienda_nube_publish_item(item_id, public_images):
-
+    
+    logger.info("publish process started")
     product_data, variant_data, attribute_id, product_id, variant_id = aux_format_data(item_id, public_images)
 
     if product_id:
-        print("product already published, nothing to do.")
+        logger.info("product already published, nothing to do.")
         return None
     
     else:
@@ -72,7 +74,7 @@ def tienda_nube_publish_item(item_id, public_images):
         product_data['variant'] = variant_data
         response = requests.post(url_base, headers=headers, data=json.dumps(product_data))
         if response.status_code == 201:
-            print("product correctly published!")
+            logger.info("product correctly published!")
             product_id = response.json()['id']
             variant_id = response.json()['variants'][0]['id']
             data = {
@@ -84,7 +86,7 @@ def tienda_nube_publish_item(item_id, public_images):
             load_tienda_nube_product_status(data)
             return product_id, variant_id    
         else:
-            print("product failed to be published!")
+            logger.info("product failed to be published!")
             data = {
                 "attribute_id": attribute_id,
                 "product_id": None, 
@@ -98,70 +100,84 @@ def tienda_nube_publish_item(item_id, public_images):
 
 def tienda_nube_update_item(item_id, public_images):
     
-    print("updating process started")
+    logger.info("update process started")
     url_base, headers = aux_base_url()
     product_data, variant_data, attribute_id, product_id, variant_id = aux_format_data(item_id, public_images)
+    update_response = {
+        "attribute_id": attribute_id,
+        "product_id": product_id, 
+        "variant_id": variant_id,
+        "response": None,
+        "updated_at": None}
+
 
     images = product_data.pop('images')
     url_upd_product = f"{url_base}/{product_id}"
+    url_upd_variant = f"{url_upd_product}/variants/{variant_id}"
+    url_upd_image = f"{url_upd_product}/images"
+
     response = requests.put(url_upd_product, headers=headers, data=json.dumps(product_data))
     if response.status_code == 200:
-        print(response.status_code)
-        print("product correctly updated!")
+        logger.info(response.status_code)
+        logger.info("product correctly updated!")
     else:
-        print("product failed to update")
-        print(response.json())
+        logger.error("product failed to update")
+        update_response['response'] = str(response.json())
+        update_response['updated_at'] = datetime.now()
+        load_tienda_nube_product_status(update_response)
+        return
 
-    url_upd_variant = f"{url_upd_product}/variants/{variant_id}"
     response = requests.put(url_upd_variant, headers=headers, data=json.dumps(variant_data))
-    print(response.status_code)
+    logger.info(response.status_code)
     if response.status_code == 200:
-        print("variant correctly updated!")
+        logger.info("variant correctly updated!")
     else:
-        print("variant failed to update")
-        print(response.json())
+        logger.error("variant failed to update")
+        update_response['response'] = str(response.json())
+        update_response['updated_at'] = datetime.now()
+        load_tienda_nube_product_status(update_response)
+        return
 
-    url_upd_image = f"{url_upd_product}/images"
     response = requests.get(url_upd_image, headers=headers)
     product_images = response.json()
     for p_image in product_images:
         id = p_image['id']
         response = requests.delete(f"{url_upd_image}/{id}", headers=headers)
-        if response.status_code != 200:
-            print(f"error deleting image {id}")
-            print(response.json())
-        print("image deleted correctly")
-
+        if response.status_code == 200:
+            logger.info("image deleted correctly")
+        else:
+            logger.info(f"error deleting image {id}")
 
     for image in images:
         response = requests.post(url_upd_image, headers=headers, data=json.dumps(image))
         if response.status_code == 201:
-            print("image correctly loaded")
+            logger.info("image correctly loaded")
+            update_response['response'] = "producto actualizado correctamente"
+            update_response['updated_at'] = datetime.now()
+            load_tienda_nube_product_status(update_response)
+            return
         else:
-            print(f"image failed to load : {response.text}")
+            logger.error("images failed to update")
+            update_response['response'] = str(response.json())
+            update_response['updated_at'] = datetime.now()
+            load_tienda_nube_product_status(update_response)
+            return
 
-    data = {
-            "attribute_id": attribute_id,
-            "product_id": product_id, 
-            "variant_id": variant_id,
-            "response": "producto actualizado correctamente",
-            "updated_at": datetime.now()}
-    load_tienda_nube_product_status(data)
 
 
 ###==========================DELETE=================================##
 def tienda_nube_delete_item(item_id):
-
+    logger.info("delete process started")
     url_base, headers = aux_base_url()
     product_data, variant_data, attribute_id, product_id, variant_id = aux_format_data(item_id,None)
     data = {"attribute_id": attribute_id}
     del_url = f"{url_base}/{product_id}"
     response = requests.delete(del_url, headers=headers)
     if response.status_code == 200:
-        print("product correctly deleted!")
+        logger.info("product correctly deleted!")
         delete_tienda_nube_product_status(data)
     else:
-        print("product failed to delete")
+        logger.info("product failed to delete")
         data = {
             "attribute_id": attribute_id,
             "product_id": product_id, 
