@@ -64,8 +64,7 @@ def aux_format_data(item_id, public_images):
         {
         "price": _aux_cast(data.get("price_tienda_nube", 0)),
         "promotional_price": _aux_cast(data.get("promotional_price", 0)),
-        #"stock": _aux_cast(data.get("stock", 0)),
-        "stock": 100,
+        "stock": _aux_cast(data.get("stock", 0)),
         "sku": data.get("sku", None),
         "barcode": data.get("barcode", None),
         "weight": dimtions_norm.get("weight", 0),
