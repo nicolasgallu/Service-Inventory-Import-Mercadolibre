@@ -20,8 +20,27 @@ def aux_format_data(item_id, public_images):
             return 0
         else:
             return int(value)
-
+        
+    def _aux_dimentions(data):
+        dimentions = data.get('dimentions',None)
+        if dimentions:
+            dimentions = dimentions.split("x")
+            height = dimentions[0]
+            width = dimentions[1]
+            depth = dimentions[2].split(',')[0]
+            weight = int(dimentions[2].split(',')[1])/1000
+            dimtions_norm = {
+                "height":height,
+                "width":width,
+                "depth":depth,
+                "weight":weight,
+            }
+            return dimtions_norm
+        else:
+            return {}
+        
     data = get_tienda_nube_item_data(item_id)
+    dimtions_norm = _aux_dimentions(data)
     attribute_id = data.get("attribute_id")
     product_id = data.get("product_id", None)
     variant_id = data.get("variant_id", None)
@@ -38,6 +57,7 @@ def aux_format_data(item_id, public_images):
         "tags": data.get("tags", None)
     }
 
+    
     variant_data = [
         {
         "price": _aux_cast(data.get("price_tienda_nube", 0)),
@@ -45,10 +65,10 @@ def aux_format_data(item_id, public_images):
         "stock": _aux_cast(data.get("stock", 0)),
         "sku": data.get("sku", None),
         "barcode": data.get("barcode", None),
-        "weight": _aux_cast(data.get("weight", 0)),
-        "width": _aux_cast(data.get("width", 0)),
-        "height": _aux_cast(data.get("height", 0)),
-        "depth": _aux_cast(data.get("depth", 0)),
+        "weight": _aux_cast(dimtions_norm.get("weight", 0)),
+        "width": _aux_cast(dimtions_norm.get("width", 0)),
+        "height": _aux_cast(dimtions_norm.get("height", 0)),
+        "depth": _aux_cast(dimtions_norm.get("depth", 0)),
         "cost": _aux_cast(data.get("cost", 0)),
         "mpn": data.get("mpn", None),
         "age_group": data.get("age_group", None),
