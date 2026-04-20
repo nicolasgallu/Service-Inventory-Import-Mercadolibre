@@ -200,7 +200,7 @@ def tienda_nube_update_item(item_id):
 def tienda_nube_delete_item(item_id):
     logger.info("delete process started")
     url_base, headers = aux_base_url()
-    product_data, variant_data, attribute_id, product_id, variant_id = aux_format_data(item_id,None)
+    product_data, variant_data, attribute_id, product_id, variant_id = aux_format_data(item_id)
     data = {"attribute_id": attribute_id}
     del_url = f"{url_base}/{product_id}"
     response = requests.delete(del_url, headers=headers)
