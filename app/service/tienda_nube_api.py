@@ -35,10 +35,8 @@ def aux_format_data(item_id, public_images):
                 "depth":depth,
                 "weight":weight,
             }
-            logger.info(f"dimentions: {dimtions_norm}")
             return dimtions_norm
         else:
-            logger.info("bad dimention")
             return {}
         
     data = get_tienda_nube_item_data(item_id)
@@ -150,7 +148,7 @@ def tienda_nube_update_item(item_id, public_images):
         load_tienda_nube_product_status(update_response)
         return
 
-    response = requests.put(url_upd_variant, headers=headers, data=json.dumps(variant_data))
+    response = requests.put(url_upd_variant, headers=headers, data=json.dumps(variant_data[0]))
     logger.info(response.status_code)
     if response.status_code == 200:
         logger.info("variant correctly updated!")
