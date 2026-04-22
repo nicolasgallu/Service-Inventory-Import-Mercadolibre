@@ -29,7 +29,7 @@ def aux_format_data(item_id):
             height = int(dimentions[0])
             width = int(dimentions[1])
             depth = int(dimentions[2].split(',')[0])
-            weight = int(dimentions[2].split(',')[1])/1000
+            weight = int(float(dimentions[2].split(',')[1])/1000)
             dimtions_norm = {
                 "height":height,
                 "width":width,
