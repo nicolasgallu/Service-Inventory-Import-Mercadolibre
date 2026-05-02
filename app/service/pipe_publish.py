@@ -12,16 +12,18 @@ def pipeline_publish(response):
     """
     event_type = response['event_type']
     item_id = response['item_id']
-    
-    if response['site'] == 'tienda-nube':
-        logger.info("TiendaNube Product Notification")        
-        if event_type == "delete":
-            tienda_nube_delete_item(item_id)
-        elif event_type == "publish":
-            tienda_nube_publish_item(item_id)
-        elif event_type == "update":
-            tienda_nube_update_item(item_id)
-        return
+    if 'site' in response:
+        if response['site'] == 'tienda-nube':
+            logger.info("TiendaNube Product Notification")        
+            if event_type == "delete":
+                tienda_nube_delete_item(item_id)
+            elif event_type == "publish":
+                tienda_nube_publish_item(item_id)
+            elif event_type == "update":
+                tienda_nube_update_item(item_id)
+            return
+        else:
+            return
 
     else:
 
