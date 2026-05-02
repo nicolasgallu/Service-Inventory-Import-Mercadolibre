@@ -179,19 +179,19 @@ def tienda_nube_update_item(item_id):
         else:
             logger.info(f"error deleting image {id}")
 
-    response = requests.post(url_upd_image, headers=headers, data=json.dumps(images))
-    if response.status_code == 201:
-        logger.info("image correctly loaded")
-        update_response['response'] = "producto actualizado correctamente"
-        update_response['updated_at'] = datetime.now()
-        load_tienda_nube_product_status(update_response)
-        return
-    else:
-        logger.error("images failed to update")
-        update_response['response'] = str(response.json())
-        update_response['updated_at'] = datetime.now()
-        load_tienda_nube_product_status(update_response)
-        return
+    for image in images:
+        response = requests.post(url_upd_image, headers=headers, data=json.dumps(image))
+        if response.status_code == 201:
+            logger.info("image correctly loaded")
+            continue
+        else:
+            logger.error("images failed to update")
+            logger.info(str(response.json()))
+            continue
+
+    update_response['response'] = "producto actualizado correctamente"
+    update_response['updated_at'] = datetime.now()
+    load_tienda_nube_product_status(update_response)
 
 
 
