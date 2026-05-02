@@ -20,7 +20,6 @@ from app.utils.logger import logger
 SECRET_ID = "secrets--guiaslocales-api"
 
 DRIVE_PARENT_ID = '1dd2P6OkaFgvkah-sBr_sjagAnCk31n-v'
-TARGET_FOLDER_NAME = '182717'
 SCOPES_DRIVE = ['https://www.googleapis.com/auth/drive.file']
 
 def get_drive_creds_from_secret():
@@ -79,14 +78,14 @@ def mvp_meli_pictures(item_id):
             return "No images found", 200
 
         # 2. Setup Drive Folder
-        query = f"name = '{TARGET_FOLDER_NAME}' and '{DRIVE_PARENT_ID}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+        query = f"name = '{item_id}' and '{DRIVE_PARENT_ID}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
         res = drive_service.files().list(q=query, fields="files(id)").execute()
         items = res.get('files', [])
         
         if items:
             folder_id = items[0]['id']
         else:
-            meta = {'name': TARGET_FOLDER_NAME, 'parents': [DRIVE_PARENT_ID], 'mimeType': 'application/vnd.google-apps.folder'}
+            meta = {'name': item_id, 'parents': [DRIVE_PARENT_ID], 'mimeType': 'application/vnd.google-apps.folder'}
             folder_id = drive_service.files().create(body=meta, fields='id').execute().get('id')
 
         # 3. Process Images
