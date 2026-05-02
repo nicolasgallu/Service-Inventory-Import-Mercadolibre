@@ -33,10 +33,11 @@ def pipeline_publish(response):
             token = meli_secrets()
 
             if event_type == "meli_pictures":
+                logger.info("executing mvp meli pictures job")
                 mvp_meli_pictures(item_id)
                 tienda_nube_update_item(item_id)
 
-            if event_type == "pre-publish":
+            elif event_type == "pre-publish":
                 logger.info(response.get('data').get('field'))
                 ai_call_prepublish(response, item_data)
 

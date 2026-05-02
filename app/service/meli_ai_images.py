@@ -12,6 +12,8 @@ from app.settings.config import PROJECT_ID
 import google.auth # This handles ADC
 from app.service.database import get_item_data
 from app.service.secrets import meli_secrets
+from app.utils.logger import logger
+
 
 # --- CONFIGURATION ---
 # In Cloud Functions, PROJECT_ID is usually available as an env var
@@ -42,7 +44,7 @@ def get_drive_creds_from_secret():
     # 4. Refresh if needed
     if not drive_creds or not drive_creds.valid:
         if drive_creds and drive_creds.expired and drive_creds.refresh_token:
-            print("🔄 Refreshing Drive Access Token...")
+            logger.info("🔄 Refreshing Drive Access Token...")
             drive_creds.refresh(Request())
             
             # Update the secret so the next execution has a fresh token
@@ -50,7 +52,7 @@ def get_drive_creds_from_secret():
             parent = f"projects/{PROJECT_ID}/secrets/{SECRET_ID}"
             payload = json.dumps(new_creds_dict).encode("UTF-8")
             client.add_secret_version(request={"parent": parent, "payload": {"data": payload}})
-            print("✅ Secret Manager updated with fresh token.")
+            logger.info("✅ Secret Manager updated with fresh token.")
             
     return drive_creds
 
@@ -103,12 +105,12 @@ def mvp_meli_pictures(item_id):
                     file_meta = {'name': f"{item_id}_{idx}.png", 'parents': [folder_id]}
                     media = MediaIoBaseUpload(png_buffer, mimetype='image/png')
                     drive_service.files().create(body=file_meta, media_body=media).execute()
-                    print(f"Uploaded {idx}")
+                    logger.info(f"Uploaded {idx}")
 
         return "Success", 200
 
     except Exception as e:
-        print(f"Error: {str(e)}")
+        logger.info(f"Error: {str(e)}")
         return f"Internal Error: {str(e)}", 500
     
 
