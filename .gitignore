@@ -13,4 +13,5 @@ test.py
 test_wh_publications.py
 test_wh_sells.py
 test_selling_cost.py
-tn_test.py
+tn_token.py
+test_batch.py

@@ -5,6 +5,7 @@ from app.service.google_pictures import process_images_storage
 from app.service.meli_api import publish_item, update_item, pause_item, delete_item
 from app.service.tienda_nube_api import tienda_nube_publish_item, tienda_nube_update_item, tienda_nube_delete_item
 from app.utils.logger import logger
+from app.service.meli_ai_images import mvp_meli_pictures
 
 def pipeline_publish(response):
     """
@@ -28,6 +29,11 @@ def pipeline_publish(response):
             logger.info("Meli Product Notification")
             item_data = get_item_data(item_id)
             token = meli_secrets()
+
+            if event_type == "meli_pictures":
+                logger.info(response.get('data').get('field'))
+                mvp_meli_pictures(item_id)
+                tienda_nube_update_item(item_id)
 
             if event_type == "pre-publish":
                 logger.info(response.get('data').get('field'))

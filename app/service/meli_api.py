@@ -414,7 +414,7 @@ def update_body(meli_id, item_data, new_data, status, token):
         return
     else:
         logger.error(f"Failed to update item: {meli_id} \n {response.json()}")
-        message = f"""Fallo la actualizacion del item {meli_id} en Mercadolibre. La respuesta fue:\nÑ
+        message = f"""Fallo la actualizacion del item {meli_id} en Mercadolibre. La respuesta fue:\n
         {response.json()}"""
         enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, message)
         return

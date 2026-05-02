@@ -14,17 +14,12 @@ def get_services():
     En GCP, esto toma automáticamente los permisos de la Service Account asociada.
     """
     try:
-        # 1. Obtener credenciales predeterminadas del entorno (ADC)
-        # Esto reemplaza service_account.Credentials.from_service_account_file
         creds, project = google.auth.default(
             scopes=['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/cloud-platform']
         )
         
-        # 2. Inicializar Drive Service (API de Google Drive)
         drive_service = build('drive', 'v3', credentials=creds)
-        
-        # 3. Inicializar Storage Client (API de Google Cloud Storage)
-        # Al correr en GCP, no hace falta pasar creds explícitamente si usas el cliente nativo
+    
         storage_client = storage.Client(credentials=creds)
         bucket_client = storage_client.bucket(BUCKET_NAME)
         
@@ -40,7 +35,6 @@ def process_images_storage(item_id):
     """
     drive_service, bucket_client = get_services()
 
-    # 1. Buscar la carpeta específica del ítem dentro de la carpeta madre
     folder_query = (
         f"name = '{item_id}' "
         f"and '{ID_CARPETA_MADRE}' in parents "
@@ -55,9 +49,6 @@ def process_images_storage(item_id):
         return []
     
     folder_id = folders[0]['id']
-
-    # 2. Listar archivos dentro de la carpeta (ordenar por los últimos creados)
-    # Filtramos para intentar traer solo imágenes
     file_query = f"'{folder_id}' in parents and mimeType contains 'image/' and trashed = false"
     results = drive_service.files().list(
         q=file_query, 
@@ -68,11 +59,8 @@ def process_images_storage(item_id):
     if not results:
         logger.info(f"Folder: '{item_id}' is empty.")
         return []
-
-    # Tomamos solo los últimos 5
     last_5_files = results[:5]
     public_images = []
-
     logger.info(f"Processing {len(last_5_files)} images from item: {item_id}...")
 
 
@@ -81,13 +69,10 @@ def process_images_storage(item_id):
         for blob in blobs:
             blob.delete()
 
-    # 3. Descarga y Carga (Stream)
     for index, file in enumerate(last_5_files):
         file_id = file['id']
         blob_name = f"{item_id}/foto_{datetime.now().isoformat()}_{index + 1}.png"
         blob = bucket_client.blob(blob_name)
-
-        # Descarga de Drive a Buffer de memoria
         request = drive_service.files().get_media(fileId=file_id)
         file_stream = io.BytesIO()
         downloader = MediaIoBaseDownload(file_stream, request)
@@ -98,16 +83,11 @@ def process_images_storage(item_id):
         
         file_stream.seek(0)
 
-        # Subida a GCS
         blob.upload_from_file(file_stream, content_type='image/png')
-        
-        # Ya no usamos blob.make_public() porque el bucket ya es público por IAM
-        # Solo obtenemos la URL
         public_url = f"https://storage.googleapis.com/{BUCKET_NAME}/{blob_name}"
         public_images.append({'source':public_url})
         
         logger.info("Finish images loaded in bucket")
-    # 4. Resultado final
     return public_images
 
 

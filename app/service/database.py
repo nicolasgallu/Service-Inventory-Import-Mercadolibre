@@ -63,16 +63,15 @@ def get_tienda_nube_item_data(item_id):
                 FROM 
                     tienda_nube.product_status) as c ON b.attribute_id = c.attribute_id
                 
-                WHERE a.id = {item_id};
+                WHERE a.id in {item_id};
             """)
         )
-        data = [dict(row) for row in result.mappings()][0]
-        if data:
-            logger.info("Data extraction completed.")
+        data = [dict(row) for row in result.mappings()]
+        if len(data) > 1:
             return data
         else:
-            logger.info("Data extraction failed.")
-            return None
+            return data[0]
+            
 
 def load_tienda_nube_product_status(data):
     """writting field description or title using ai reply,
