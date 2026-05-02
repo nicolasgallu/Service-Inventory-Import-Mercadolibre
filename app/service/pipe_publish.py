@@ -33,7 +33,6 @@ def pipeline_publish(response):
             token = meli_secrets()
 
             if event_type == "meli_pictures":
-                logger.info(response.get('data').get('field'))
                 mvp_meli_pictures(item_id)
                 tienda_nube_update_item(item_id)
 
