@@ -66,7 +66,7 @@ def mvp_meli_pictures(item_id):
         drive_service = build('drive', 'v3', credentials=drive_creds)
 
         # MeLi Info (This could be passed via 'event' data)
-        meli_id = get_item_data().get('meli_id')
+        meli_id = get_item_data(item_id).get('meli_id')
         token = meli_secrets()
         
         # 1. Get MeLi Images
