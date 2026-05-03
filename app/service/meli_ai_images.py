@@ -25,8 +25,8 @@ def extract_id_from_url(url):
     Extracts the Google Drive folder ID from a URL.
     Handles standard /folders/ID format and ?id=ID format.
     """
-    match = re.search(r"(?<=folders/|id=)([a-zA-Z0-9-_]{25,})", url)
-    return match.group(0) if match else None
+    match = re.search(r"(?:folders/|id=)([a-zA-Z0-9-_]{25,})", url)
+    return match.group(1) if match else None
 
 def get_drive_creds_from_secret():
     """
