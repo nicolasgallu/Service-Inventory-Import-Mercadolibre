@@ -79,11 +79,16 @@ def mvp_meli_pictures(item_id):
 
         # 2. Setup Drive Folder
         query = f"name = '{item_id}' and '{DRIVE_PARENT_ID}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
-        res = drive_service.files().list(q=query, fields="files(id)").execute()
+
+        res = drive_service.files().list(
+            q=query, 
+            fields="files(id, name)",
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True).execute()
         items = res.get('files', [])
+
         logger.info("now returning items info")
         logger.info(items)
-        
         folder_id = items[0]['id']
 
         # 3. Process Images
