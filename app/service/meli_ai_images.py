@@ -99,7 +99,7 @@ def mvp_meli_pictures(item_id):
 
                     file_meta = {'name': f"{item_id}_{idx}.png", 'parents': [folder_id]}
                     media = MediaIoBaseUpload(png_buffer, mimetype='image/png')
-                    drive_service.files().create(body=file_meta, media_body=media).execute()
+                    drive_service.files().create(body=file_meta, media_body=media,supportsAllDrives=True).execute()
                     logger.info(f"Uploaded {idx}")
 
         return "Success", 200
