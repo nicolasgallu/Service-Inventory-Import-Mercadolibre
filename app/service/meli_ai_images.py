@@ -82,11 +82,7 @@ def mvp_meli_pictures(item_id):
         res = drive_service.files().list(q=query, fields="files(id)").execute()
         items = res.get('files', [])
         
-        if items:
-            folder_id = items[0]['id']
-        else:
-            meta = {'name': item_id, 'parents': [DRIVE_PARENT_ID], 'mimeType': 'application/vnd.google-apps.folder'}
-            folder_id = drive_service.files().create(body=meta, fields='id').execute().get('id')
+        folder_id = items[0]['id']
 
         # 3. Process Images
         for idx, pic in enumerate(pictures):
