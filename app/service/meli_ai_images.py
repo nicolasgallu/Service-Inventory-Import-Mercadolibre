@@ -81,6 +81,8 @@ def mvp_meli_pictures(item_id):
         query = f"name = '{item_id}' and '{DRIVE_PARENT_ID}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
         res = drive_service.files().list(q=query, fields="files(id)").execute()
         items = res.get('files', [])
+        logger.info("now returning items info")
+        logger.info(items)
         
         folder_id = items[0]['id']
 
