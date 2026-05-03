@@ -18,7 +18,7 @@ from app.utils.logger import logger
 
 # --- CONFIGURATION ---
 SECRET_ID = "secrets--guiaslocales-api"
-SCOPES_DRIVE = ['https://www.googleapis.com/auth/drive.file']
+SCOPES_DRIVE = ['https://www.googleapis.com/auth/drive']
 
 def extract_id_from_url(url):
     """
