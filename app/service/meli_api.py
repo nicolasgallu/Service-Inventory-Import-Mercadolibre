@@ -5,7 +5,7 @@ from app.service.notifications import enviar_mensaje_whapi
 from app.service.database import load_meli_data, load_failed_status
 from app.service.bot import call_ai
 from app.settings.config import (
-    TOKEN_WHAPI, PHONES, PROMPT_SYS_MELI, PROMPT_FAILED,
+    TOKEN_WHAPI, PHONE_INTERNAL, PROMPT_SYS_MELI, PROMPT_FAILED,
     CURRENCY,
     SITE,
     CONDITION,
@@ -213,11 +213,11 @@ def pause_item(item_data, token):
             return
         else:
             logger.error(f"Failed to pause item {meli_id}. Status: {response.status_code}, Error:\n {response.json()}")
-            enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, response.json())
+            enviar_mensaje_whapi(TOKEN_WHAPI, PHONE_INTERNAL, response.json())
             return
     except Exception as error:
         logger.error(f"Unexpected error while pausing {meli_id}:\n {str(error)}")
-        enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, error)
+        enviar_mensaje_whapi(TOKEN_WHAPI, PHONE_INTERNAL, error)
         return
 
 
@@ -286,7 +286,7 @@ def p_second_attempt(item_data, item_format, category_id, token, response):
         message = call_ai(usr_prompt, PROMPT_FAILED)
         item_metadata = {'status': 'no publicado','reason': message}
         load_failed_status(item_data['id'], item_metadata)
-        enviar_mensaje_whapi(TOKEN_WHAPI,PHONES, message)
+        enviar_mensaje_whapi(TOKEN_WHAPI,PHONE_INTERNAL, message)
         return
 
 def get_required_attributes(category_id, token):
@@ -397,7 +397,7 @@ def item_reactivate(meli_id, status, token):
             logger.error(f"Failed to re-activate item {meli_id}: {response.text}")
             message = f"""Fallo en la etapa de reactivar el item: {meli_id} en Mercadolibre.
                         la respuesta fue\n {response.text}"""
-            enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, message)
+            enviar_mensaje_whapi(TOKEN_WHAPI, PHONE_INTERNAL, message)
             return
     else:
         return
@@ -416,7 +416,7 @@ def update_body(meli_id, item_data, new_data, status, token):
         logger.error(f"Failed to update item: {meli_id} \n {response.json()}")
         message = f"""Fallo la actualizacion del item {meli_id} en Mercadolibre. La respuesta fue:\n
         {response.json()}"""
-        enviar_mensaje_whapi(TOKEN_WHAPI, PHONES, message)
+        enviar_mensaje_whapi(TOKEN_WHAPI, PHONE_INTERNAL, message)
         return
 
 def get_item_sales(meli_id, access_token):

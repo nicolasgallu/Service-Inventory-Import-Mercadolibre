@@ -8,15 +8,19 @@ meli_sell = Blueprint("wh_sell", __name__, url_prefix="/webhooks/sells")
 @meli_sell.route("", methods=["POST"], strict_slashes=False)
 def main():
     data = request.json
-    if data.get('topic') == 'orders_v2':
-        order_id = data.get('resource').split("/")[2]
-        # 1. Creamos y lanzamos el hilo con la lógica pesada
-        # Pasamos una copia de los datos para evitar problemas de contexto
-        thread = threading.Thread(target=pipeline_selling, args=(order_id,))
+
+    if 'topic' in data:
+        if data.get('topic') == 'orders_v2':
+            order_id = data.get('resource').split("/")[2]
+            thread = threading.Thread(target=pipeline_selling, args=(order_id, 'mercadolibre'))
+            thread.start()
+            return jsonify({"status": "accepted", "message": "Meli Selling Event"}), 202
+    elif 'store_id' in data:
+        order_id = data.get('id')
+        thread = threading.Thread(target=pipeline_selling, args=(order_id, 'tienda_nube'))
         thread.start()
-        # 2. Respondemos de inmediato
-        # 202 significa "Accepted" (aceptado para procesamiento, pero no completado aún)
-        return jsonify({"status": "accepted", "message": "Task dispatched to background"}), 202
+        return jsonify({"status": "accepted", "message": "TiendaNube Selling Event"}), 202
+
     else:
         return jsonify({"status": "ignores", "message": "message wasnt a sell"}), 200
     

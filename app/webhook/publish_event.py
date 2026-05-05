@@ -10,6 +10,6 @@ def main():
     response = request.json
     if SECRET_GUIAS != response['secret']:
         return Response(status=401)
-    logger.info("Receving notification from App Import - Dispatching thread")
+    logger.info("Receving notification from App Import")
     pipeline_publish(response)
-    return jsonify({"status": "accepted", "message": "Task dispatched to background"}), 202
+    return jsonify({"status": "accepted"}), 202

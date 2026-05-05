@@ -28,6 +28,28 @@ engine = create_engine(
     )
 
 
+def get_tienda_nube_id(id):
+    """"""
+    with engine.begin() as conn:
+        logger.info(f"Extracting data from item: {id}.")
+        result = conn.execute(
+            text(f"""
+                SELECT 
+                    attribute_id,
+                    product_id,
+                    item_id
+                FROM tienda_nube.product_status
+                LEFT JOIN (
+                SELECT 
+                    id as attribute_id,
+                    item_id
+                FROM tienda_nube.attributes) as b using (attribute_id)
+                WHERE product_id = {id};
+            """)
+        )
+        data = [dict(row) for row in result.mappings()][0]
+        return data
+
 
 def get_tienda_nube_item_data(item_id):
     """"""
@@ -66,7 +88,7 @@ def get_tienda_nube_item_data(item_id):
                 WHERE a.id = {item_id};
             """)
         )
-        #REVISAR PORQUE ESTA MAL.
+        #REVISAR PORQUE ADOPTE ESTE DISEÑO (BATCH)
         data = [dict(row) for row in result.mappings()]
         if len(data) > 1:
             return data
@@ -235,33 +257,31 @@ def load_meli_data(item_id, item_metadata):
 
 #//////////////MELI ORDERS LOGIC//////////////
 
-def get_order(order_id):
+def get_order(order_id, platform):
     """Checking if order exists in DB
     Returns True if exists otherwise False."""
     with engine.begin() as conn:
-        logger.info("Getting order from DB.")
+        logger.info(f"Getting order from orders table in {platform}.")
         result = conn.execute(
             text(f"""
                 SELECT
                 id
-                FROM mercadolibre.orders
+                FROM {platform}.orders
                 WHERE id = {order_id};
             """)
         )
-    try:
-        # Intentamos obtener el primer elemento directamente
-        [dict(row) for row in result.mappings()][0]
+    if [dict(row) for row in result.mappings()][0]:
         return True
-    except IndexError:
-        # Si la lista estaba vacía, el índice [0] no existe y devuelve False
+    else:
         return False
 
-def insert_order(order):
+
+def insert_order(order, platform):
     with engine.begin() as conn:
-        logger.info("Saving Order in DB.")
+        logger.info(f"Saving order in orders table in {platform}.")
         conn.execute(
-            text("""
-                INSERT INTO mercadolibre.orders (id, data, created_at)
+            text(f"""
+                INSERT IGNORE INTO {platform}.orders (id, data, created_at)
                 VALUES (:id, :data, :created_at)
             """),order) 
         logger.info("Load Completed.")
