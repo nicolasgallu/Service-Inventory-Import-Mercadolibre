@@ -1,71 +1,17 @@
 import requests
+import json
 from app.utils.logger import logger
-from app.service.database import load_ai_response
+from app.service.database import load_ai_response, get_ai_prompt
 from app.settings.config import DS_API_KEY
 
 
-def ai_call_prepublish(event_data, item_data):
-    """generates description/title and if is not already made the brand."""
+def aux_ai(sys_prompt, user_prompt, target_field):
     
-    item_id = item_data.get('id')
-    title = item_data.get('product_name',None)
-    brand = item_data.get('brand', None)
-    model = item_data.get('model', None)
-    dimention = item_data.get('dimentions',None)
-
-    field = event_data.get('data').get('field')
-    user_prompt = event_data.get('data').get('prompt')
-
-    if field == 'product_name_meli':
-        logger.info("the request is for creating the title")
-        prev_data = item_data.get('product_name_meli', None)
-        sys_prompt = f"""
-            Tu tarea es crear un título optimizado para Mercado Libre basándote ESTRICTA Y ÚNICAMENTE en el nombre del producto proporcionado, genera
-            un titulo atractivo ya que vas a recibir el nombre original y normalmente suele no ser tan llamativo para vender.
-        
-            **Contexto de la tarea:**
-            1. Si no existe un título previo 'prev_data', genera el título desde cero siguiendo las reglas de optimización.
-            2. Si ya existe un título previo 'prev_data', tu objetivo es aplicar el feedback del usuario para refinarlo, manteniendo la estructura de venta.
-        
-            **Reglas de optimización (Meli):**
-            1. *Formato de salida:* Devuelve EXCLUSIVAMENTE el texto del título. No incluyas comillas, comentarios, etiquetas de markdown ni introducciones.
-            2. *Limited de Caracteres*: Mantenete siempre en un rango inferior a 60 caracteres.
-
-        
-            **Datos:**
-            - Nombre original del producto: {title}
-            - prev_data (contexto para cambios): {prev_data}
-            """
-    else:
-        logger.info("the request is for creating the description")
-        prev_data = item_data.get('description')
-        sys_prompt = f"""
-            Tu tarea es crear una descripción de producto para una página web basándote ESTRICTA Y ÚNICAMENTE en el nombre proporcionado.
-            **Contexto de la tarea:**
-            1. Si no existe una descripción previa 'prev_data', genera el contenido desde cero siguiendo las reglas generales.
-            2. Si ya existe una descripción previa 'prev_data', tu objetivo es actuar sobre el feedback del usuario para modificar y mejorar el resultado anterior, manteniendo siempre la coherencia con las reglas.
-            3. Vas a recibir el dato de "dimentions" para agregar a la descripcion, puede venir null, (el formato en el que viene es el siguiente ejemplo: 15x20x30,1500 "altura","ancho","largo" y "peso en gramos").
-
-            **Reglas importantes:**
-            1. *No inventes información:* No menciones materiales, dimensiones, colores u origen a menos que estén en el nombre del producto.
-            2. *Tono formal y descriptivo:* Evita lenguaje de marketing exagerado y emojis.
-            3. *Simplicidad:* Si el nombre es limitado, la descripción debe ser genérica y breve para no crear falsas expectativas.
-            4. *Formato de salida:* Devuelve EXCLUSIVAMENTE el texto de la descripción. No incluyas comentarios, introducciones, etiquetas de markdown ni ningún otro contenido adicional.
-
-            **Datos:**
-            - Nombre del producto: {title}
-            - prev_data (contexto para cambios): {prev_data}
-            - Dimentions:{dimention} 
-            """
-
-
-    logger.info(f"Autocompleting field: {field}")
-
     payload = {
         "model": "deepseek-chat",
         "messages": [
-                {"role": "system", "content": sys_prompt},
-                {"role": "user", "content": user_prompt}
+                {"role": "system", "content": json.dumps(sys_prompt)},
+                {"role": "user", "content": json.dumps(user_prompt)}
             ],
         "max_tokens": 1000,
         "temperature": 0.55
@@ -74,68 +20,62 @@ def ai_call_prepublish(event_data, item_data):
         "Authorization": f"Bearer {DS_API_KEY}",
         "Content-Type": "application/json"
     }
-    response = requests.post("https://api.deepseek.com/v1/chat/completions", headers=headers, json=payload)
+    response = requests.post("https://api.deepseek.com/v1/chat/completions", 
+                             headers=headers, 
+                             json=payload
+    )
     ai_response = {'ai_response' : response.json()['choices'][0]['message']['content']}
-    load_ai_response(item_id, field, ai_response)
+    logger.info(f"AI Generated response for field: {target_field}")
+    return ai_response
 
+
+def ai_call_prepublish(event_data, item_data):
+    """generates description/title and if is not already made the brand."""
+    
+    item_id = item_data.get('id')
+    original_title = item_data.get('product_name')
+    brand = item_data.get('brand')
+    model = item_data.get('model')
+    
+    target_field = event_data.get('data').get('field')
+    user_prompt = event_data.get('data').get('prompt')
+
+    logger.info(f"Request to create information with AI over field: {target_field}.")
+
+    if target_field == "product_name_meli":
+        previous_title = item_data.get('product_name_meli')
+        sys_prompt = get_ai_prompt('ai_generate_title')
+        user_prompt = {
+            "original_name": original_title,
+            "previous_name_option": previous_title,
+            "prompt":user_prompt}
+
+    elif target_field == "description":
+        previous_description = item_data.get('description')
+        dimentions = item_data.get('dimentions')
+        sys_prompt = get_ai_prompt('ai_generate_description')
+        user_prompt = {
+            "original_name": original_title,
+            "dimentions":dimentions,
+            "previous_description_option": previous_description,
+            "prompt":user_prompt}
+
+
+    ai_response = aux_ai(sys_prompt, user_prompt, target_field)
+    load_ai_response(item_id, target_field, ai_response)
 
     if not brand:
-        logger.info("Autocompleting Brand")
-        user_prompt = f"el nombre del producto del cual necesito la marca es este: {title}"
-        sys_prompt = """
-            Tu tarea es identificar la MARCA de un producto basándote en su nombre comercial. 
-            Reglas estrictas:
-            1. Extrae el nombre del fabricante o marca comercial presente en el texto.
-            2. Si el nombre del producto NO contiene una marca explícita, pero el modelo es universalmente reconocido 
-            (ej. 'iPhone 13' -> Apple), devuelve la marca correspondiente.
-            3. Si el producto es genérico o no hay ninguna pista sobre el fabricante, responde ÚNICAMENTE con la palabra: 'Genérico'.
-            4. No añadas explicaciones, adjetivos ni texto adicional. Solo el nombre de la marca.
-            5. Si detectas varias marcas (ej. una colaboración), menciona ambas separadas por una coma."""
-        payload = {
-            "model": "deepseek-chat",
-            "messages": [
-                    {"role": "system", "content": sys_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-            "max_tokens": 1000,
-            "temperature": 0.55
-        }       
-        headers = {
-            "Authorization": f"Bearer {DS_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        response = requests.post("https://api.deepseek.com/v1/chat/completions", headers=headers, json=payload)
-        ai_response = {'ai_response' : response.json()['choices'][0]['message']['content']}
+        logger.info("AI Automatic - Creating Brand.")
+        sys_prompt = get_ai_prompt('ai_generate_brand')
+        user_prompt = {
+            "original_name": original_title}
+        ai_response = aux_ai(sys_prompt, user_prompt, 'brand')
         load_ai_response(item_id, 'brand', ai_response)
 
-
     if not model:
-        logger.info("Autocompleting Model")
-        user_prompt = f"El nombre del producto del cual necesito extraer el modelo es este: {title}"
-
-        sys_prompt = """
-            Tu tarea es identificar el MODELO específico de un producto basándote en su nombre comercial.
-            Reglas estrictas:
-            1. Extrae únicamente el modelo (ej. 'S23 Ultra', 'M407', 'WH-1000XM5').
-            2. No incluyas la marca en el resultado, a menos que la marca sea parte integral del nombre del modelo.
-            3. Prioriza códigos alfanuméricos, versiones (Pro, Max, Lite) o nombres específicos de la serie.
-            4. Si el nombre del producto NO contiene un modelo explícito, responde ÚNICAMENTE con la palabra: 'No definido'.
-            5. No añadas explicaciones, introducciones ni texto adicional. Solo el nombre del modelo.
-            6. Si el título incluye el modelo y también el año de la versión (ej. 'Modelo 2024'), inclúyelo si ayuda a diferenciar el producto.
-        """
-        payload = {
-            "model": "deepseek-chat",
-            "messages": [
-                    {"role": "system", "content": sys_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-            "max_tokens": 1000,
-            "temperature": 0.55
-        }       
-        headers = {
-            "Authorization": f"Bearer {DS_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        response = requests.post("https://api.deepseek.com/v1/chat/completions", headers=headers, json=payload)
-        ai_response = {'ai_response' : response.json()['choices'][0]['message']['content']}
+        logger.info("AI Automatic - Creating Model.")
+        sys_prompt = get_ai_prompt('ai_generate_model')
+        user_prompt = {
+            "original_name": original_title}
+        ai_response = aux_ai(sys_prompt, user_prompt, 'model')
         load_ai_response(item_id, 'model', ai_response)

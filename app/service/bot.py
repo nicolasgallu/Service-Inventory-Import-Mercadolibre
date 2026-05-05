@@ -3,8 +3,7 @@ from app.settings.config import DS_API_KEY
 
 
 def call_ai(user_prompt, ai_prompt):
-
-
+    
     headers = {
         "Authorization": f"Bearer {DS_API_KEY}",
         "Content-Type": "application/json"

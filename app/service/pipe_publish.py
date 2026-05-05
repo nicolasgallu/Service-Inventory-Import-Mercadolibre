@@ -12,7 +12,15 @@ def pipeline_publish(response):
     """
     event_type = response['event_type']
     item_id = response['item_id']
-    if 'site' in response:
+
+    if event_type == 'pre-publish':
+        logger.info("Processing Pre-Publish Event")
+        item_data = get_item_data(item_id)
+        ai_call_prepublish(response, item_data)
+        return
+
+
+    elif 'site' in response:
         if response['site'] == 'tienda-nube':
             logger.info("TiendaNube Product Notification")        
             if event_type == "delete":
@@ -22,8 +30,7 @@ def pipeline_publish(response):
             elif event_type == "update":
                 tienda_nube_update_item(item_id)
             return
-        else:
-            return
+
 
     else:
 
@@ -36,10 +43,6 @@ def pipeline_publish(response):
                 logger.info("executing mvp meli pictures job")
                 mvp_meli_pictures(item_id)
                 tienda_nube_update_item(item_id)
-
-            elif event_type == "pre-publish":
-                logger.info(response.get('data').get('field'))
-                ai_call_prepublish(response, item_data)
 
             elif event_type == "delete":
                 delete_item(item_data, token)

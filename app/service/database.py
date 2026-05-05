@@ -2,12 +2,6 @@ from sqlalchemy import create_engine, text
 from google.cloud.sql.connector import Connector
 from app.settings.config import INSTANCE_DB, USER_DB, PASSWORD_DB, NAME_DB
 from app.utils.logger import logger
-from datetime import datetime
-
-##!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-##CAMBIAR ESQUEMAS FIJOS A PARAMETROS 
-##!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 
 def getconn():
     connector = Connector() 
@@ -26,6 +20,22 @@ engine = create_engine(
         pool_size=5,
         max_overflow=2,
     )
+
+
+def get_ai_prompt(field):
+    with engine.begin() as conn:
+        logger.info(f"Extracting AI prompt: {field}.")
+        result = conn.execute(
+            text(f"""
+                SELECT 
+                    {field}
+                FROM mercadolibre.prompts
+                LIMIT1;
+            """)
+        )
+        data = [dict(row) for row in result.mappings()][0]
+        logger.info("Extraction Complete.")
+        return data
 
 
 def get_tienda_nube_id(id):
