@@ -17,6 +17,9 @@ def main():
             thread = threading.Thread(target=pipeline_selling, args=(order_id, 'mercadolibre'))
             thread.start()
             return jsonify({"status": "accepted", "message": "Meli Selling Event"}), 202
+        else: 
+            return jsonify({"status": "ignores", "message": "message wasnt a sell"}), 200
+
     elif 'store_id' in data:
         order_id = data.get('id')
         thread = threading.Thread(target=pipeline_selling, args=(order_id, 'tienda_nube'))
