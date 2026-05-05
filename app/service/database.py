@@ -61,7 +61,10 @@ def get_tienda_nube_item_data(item_id):
                  a.*,
                  b.*,
                  c.product_id,
-                 c.variant_id FROM app_import.product_catalog_sync as a
+                 c.variant_id,
+                 d.category_id 
+                 
+                FROM app_import.product_catalog_sync as a
                 LEFT JOIN (
                 SELECT 
                     id as attribute_id,
@@ -84,6 +87,10 @@ def get_tienda_nube_item_data(item_id):
                     variant_id
                 FROM 
                     tienda_nube.product_status) as c ON b.attribute_id = c.attribute_id
+                 
+                LEFT JOIN 
+                 (select id as category_id, name as category_name from tienda_nube.categories) as d
+                 ON d.category_name = a.product_type_path
                 
                 WHERE a.id = {item_id};
             """)
@@ -288,6 +295,36 @@ def insert_order(order, platform):
                 VALUES (:id, :data, :created_at)
             """),order) 
         logger.info("Load Completed.")
+
+def db_tiendanube_category(operation:str, data:str):
+    """
+    Returns True/False if category name exists (using 'get')
+    Insert new record (using 'post')
+    """
+    with engine.begin() as conn:
+        logger.info(f"{operation} operation over tienda_nube.categories.")
+
+        if operation == 'get':
+            result = conn.execute(
+                text(f"""SELECT name 
+                     from tienda_nube.categories 
+                     where LOWER(name) = '{data.lower()}'
+                     limit 1"""))
+            
+            data = [dict(row) for row in result.mappings()]
+            if data:
+                return True
+            else:
+                return False
+
+        elif operation == 'post':
+            conn.execute(
+                text(f"""
+                    INSERT IGNORE INTO tienda_nube.categories (id, name, data)
+                    VALUES (:id, :name, :data)
+                """),data) 
+            
+        logger.info(f"Operation {operation} Completed.")
 
 def get_bitcram_data(meli_id):
     """"""

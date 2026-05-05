@@ -1,4 +1,8 @@
-from app.service.database import get_tienda_nube_item_data,load_tienda_nube_product_status,delete_tienda_nube_product_status
+from app.service.database import ( 
+    get_tienda_nube_item_data,
+    load_tienda_nube_product_status,
+    delete_tienda_nube_product_status,
+    db_tiendanube_category)
 from app.service.google_pictures import process_images_storage
 from app.service.secrets import tienda_nube_secrets
 import requests
@@ -6,7 +10,7 @@ import json
 from datetime import datetime
 from app.utils.logger import logger
 
-def aux_base_url():
+def aux_base_products_url():
     token, user_id = tienda_nube_secrets()
     url_base = f"https://api.tiendanube.com/v1/{user_id}/products"
     headers = {
@@ -55,18 +59,24 @@ def aux_format_data(item_id):
             i['src'] = i['source']
             i.pop('source')
 
+    
+    if data.get("product_name_meli") == None:
+        product_name = data.get("product_name")
+    else:
+        product_name = data.get("product_name_meli")
+
     product_data = {
-        "name": {"es": data.get("product_name_meli", None)},
+        "name": {"es": product_name},
         "description": {"es": data.get("description", None)},
-        "seo_title": {"es": data.get("seo_title", None)},
+        "seo_title": {"es": product_name},
         "seo_description": {"es": data.get("seo_description", None)},
         "free_shipping": False if data.get("free_shipping", False) == 0 else True,
         "brand": data.get("brand", None),
         "video_url": data.get("video_url", None),
         "images": public_images,
-        "tags": data.get("tags", None)
+        "tags": data.get("tags", None),
+        "categories": [data.get("category_id",None)]
     }
-
     
     variant_data = [
         {
@@ -100,7 +110,7 @@ def tienda_nube_publish_item(item_id):
         return None
     
     else:
-        url_base, headers = aux_base_url()
+        url_base, headers = aux_base_products_url()
         product_data['variants'] = variant_data
         response = requests.post(url_base, headers=headers, data=json.dumps(product_data))
         if response.status_code == 201:
@@ -131,7 +141,7 @@ def tienda_nube_publish_item(item_id):
 def tienda_nube_update_item(item_id):
     
     logger.info("update process started")
-    url_base, headers = aux_base_url()
+    url_base, headers = aux_base_products_url()
     product_data, variant_data, attribute_id, product_id, variant_id = aux_format_data(item_id)
     update_response = {
         "attribute_id": attribute_id,
@@ -198,7 +208,7 @@ def tienda_nube_update_item(item_id):
 ###==========================DELETE=================================##
 def tienda_nube_delete_item(item_id):
     logger.info("delete process started")
-    url_base, headers = aux_base_url()
+    url_base, headers = aux_base_products_url()
     product_data, variant_data, attribute_id, product_id, variant_id = aux_format_data(item_id)
     data = {"attribute_id": attribute_id}
     del_url = f"{url_base}/{product_id}"
@@ -215,3 +225,43 @@ def tienda_nube_delete_item(item_id):
             "response": str(response.json()),
             "updated_at": datetime.now()}
         load_tienda_nube_product_status(data)
+
+
+def create_categories(category_name):
+
+    if db_tiendanube_category('get', category_name):
+        logger.info(f"Category {category_name} already exists, nothing to do.")
+        return None
+    
+    else:
+
+        token, user_id = tienda_nube_secrets()
+        url = f"https://api.tiendanube.com/v1/{user_id}/categories"
+        headers = {
+            "Authentication": f"bearer {token}",
+            "Content-Type": "application/json"}
+
+        payload = {
+        "name": {
+          "es": category_name}}
+
+        response = requests.post(url=url,headers=headers,data=json.dumps(payload))
+
+        if response.status_code < 300:
+            logger.info(f"Category {category_name} succesfully created")
+            response_dict = response.json()
+            catgory_id = response_dict.get('id')
+            response_dict.pop('id')
+            catgory_name = response_dict.get('name').get('es')
+            catgory_info = response_dict
+
+            data = {
+                'id':catgory_id,
+                'name':catgory_name,
+                'data':json.dumps(catgory_info),
+            }
+
+            db_tiendanube_category('post', data)
+
+        else:
+            logger.error(f'Error creating category {category_name} : {response.json()}')
