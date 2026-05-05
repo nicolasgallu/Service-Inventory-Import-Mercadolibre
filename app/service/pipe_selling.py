@@ -42,11 +42,14 @@ def pipeline_selling(order_id, platform):
                     unit_price = item_info.get('unit_price')
                     data = get_bitcram_data(meli_id)
                     id = data.get('id')
+                    insert_order(order, platform)
                     sell_workflow(id, quantity, unit_price)
 
             else:
+                logger.error(f"Error processing the order: {response.json()}")
                 message = f"fallo en la orden de mercadolibre: {order_id}\n {response.json()}"
                 enviar_mensaje_whapi(TOKEN_WHAPI, PHONE_INTERNAL, message)
+                return
 
 
         elif platform == 'tienda_nube':
@@ -72,17 +75,22 @@ def pipeline_selling(order_id, platform):
 
                 data = get_tienda_nube_id(product_id)
                 id = data.get('id')
+                insert_order(order, platform)
                 sell_workflow(id, quantity, price)
 
             else:
+                logger.error(f"Error processing the order: {response.json()}")
                 message = f"fallo en la orden de tiendanube: {order_id}\n {response.json()}"
                 enviar_mensaje_whapi(TOKEN_WHAPI, PHONE_INTERNAL, message)
+                return
+        return
 
-        insert_order(order, platform)
+        
 
     except Exception as e:
         logger.error(f"Error processing the order: {e}")
-        message = f"fallo en la orden de meli: {order_id}"
+        message = f"fallo en la orden de {platform}: {order_id}"
         enviar_mensaje_whapi(TOKEN_WHAPI, PHONE_INTERNAL, message)
+        return
 
 

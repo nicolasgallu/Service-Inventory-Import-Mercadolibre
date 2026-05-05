@@ -270,11 +270,14 @@ def get_order(order_id, platform):
                 WHERE id = {order_id};
             """)
         )
-    if [dict(row) for row in result.mappings()][0]:
-        return True
-    else:
-        return False
+    try:
+        if [dict(row) for row in result.mappings()][0]:
+            return True
+        else:
+            return False
 
+    except:
+        return False
 
 def insert_order(order, platform):
     with engine.begin() as conn:

@@ -9,6 +9,8 @@ meli_sell = Blueprint("wh_sell", __name__, url_prefix="/webhooks/sells")
 def main():
     data = request.json
 
+    logger.info(f"AUX: data from webhook/sells: {data}")
+
     if 'topic' in data:
         if data.get('topic') == 'orders_v2':
             order_id = data.get('resource').split("/")[2]
