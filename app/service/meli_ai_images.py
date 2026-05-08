@@ -29,17 +29,17 @@ def extract_id_from_url(url):
     return match.group(1) if match else None
 
 def get_drive_creds_from_secret():
-    """
-    Uses ADC to access Secret Manager and returns refreshed OAuth credentials.
-    """
     adc_creds, _ = google.auth.default()
     client = secretmanager.SecretManagerServiceClient(credentials=adc_creds)
     
     secret_path = f"projects/{PROJECT_ID}/secrets/{SECRET_ID}/versions/latest"
+    parent = f"projects/{PROJECT_ID}/secrets/{SECRET_ID}"
     
     response = client.access_secret_version(request={"name": secret_path})
-    creds_dict = json.loads(response.payload.data.decode("UTF-8"))
+    # Get the actual version number of the current 'latest' (e.g., .../versions/5)
+    current_version_name = response.name 
     
+    creds_dict = json.loads(response.payload.data.decode("UTF-8"))
     drive_creds = credentials.Credentials.from_authorized_user_info(creds_dict, SCOPES_DRIVE)
     
     if not drive_creds or not drive_creds.valid:
@@ -47,12 +47,21 @@ def get_drive_creds_from_secret():
             logger.info("🔄 Refreshing Drive Access Token...")
             drive_creds.refresh(Request())
             
+            # 1. Add the new secret version
             new_creds_dict = json.loads(drive_creds.to_json())
-            parent = f"projects/{PROJECT_ID}/secrets/{SECRET_ID}"
             payload = json.dumps(new_creds_dict).encode("UTF-8")
-            client.add_secret_version(request={"parent": parent, "payload": {"data": payload}})
-            logger.info("✅ Secret Manager updated with fresh token.")
-            
+            new_version = client.add_secret_version(
+                request={"parent": parent, "payload": {"data": payload}}
+            )
+            logger.info(f"✅ New version created: {new_version.name}")
+
+            # 2. Destroy ALL previous versions to keep only the new one
+            # This iterates through all versions and destroys any that aren't the one we just made
+            for version in client.list_secret_versions(request={"parent": parent}):
+                # Don't destroy the one we just created!
+                if version.name != new_version.name and version.state != secretmanager.SecretVersion.State.DESTROYED:
+                    client.destroy_secret_version(request={"name": version.name})
+                    logger.info(f"🗑️ Destroyed old secret version: {version.name}")
     return drive_creds
 
 def mvp_meli_pictures(item_id):
@@ -70,10 +79,11 @@ def mvp_meli_pictures(item_id):
         if not folder_id:
             logger.error(f"Could not extract ID from URL: {folder_url}")
             return "Invalid Folder URL", 400
-
+        
         # 2. Get Drive Service
         drive_creds = get_drive_creds_from_secret()
         drive_service = build('drive', 'v3', credentials=drive_creds)
+
 
         # 4. Get MeLi Images
         url = f"https://api.mercadolibre.com/items/{meli_id}"
@@ -84,6 +94,29 @@ def mvp_meli_pictures(item_id):
         if not pictures:
             logger.info(f"No images found for MeLi item {meli_id}")
             return "No images found", 200
+
+
+        query = f"'{folder_id}' in parents and trashed = false"
+        results = drive_service.files().list(
+            q=query,
+            fields="nextPageToken, files(id, name)",
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True
+        ).execute()
+
+        items = results.get('files', [])
+
+        if not items:
+            logger.info('No files found in the folder.')
+        else:
+            for item in items:
+                logger.info(f"Trashing file: {item['name']} (ID: {item['id']})")
+                drive_service.files().update(
+                    fileId=item['id'],
+                    body={'trashed': True},
+                    supportsAllDrives=True
+                ).execute()
+
 
         # 5. Process and Upload Images
         for idx, pic in enumerate(pictures):

@@ -20,3 +20,5 @@ test_tnube_webhooks.py
 items_with_folder.csv
 test_cat.py
 test_publications.py
+test_sells.py
+tests/
