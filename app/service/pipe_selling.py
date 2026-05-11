@@ -15,7 +15,6 @@ def pipeline_selling(order_id, platform):
     if get_order(order_id, platform):
         logger.info(f"Order: {order_id} already processed, skipping.")
         return
-    
     message= f'Nueva Orden Generada desde {platform}\n {order_id}' 
     enviar_mensaje_whapi(TOKEN_WHAPI, PHONE_CUSTOMER, message)
 
