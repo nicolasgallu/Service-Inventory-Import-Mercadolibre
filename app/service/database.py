@@ -160,8 +160,6 @@ def delete_tienda_nube_product_status(data):
 
 
 
-
-
 def get_method(data):
     """"""
     with engine.begin() as conn:
@@ -191,7 +189,6 @@ def get_method(data):
             return None
 
 
-
 def get_item_data(item_id):
     """"""
     with engine.begin() as conn:
@@ -211,136 +208,61 @@ def get_item_data(item_id):
             return None
 
 
-def load_selling_calculation(cost_detail):
-    """writting field description or title using ai reply,
-    this is part from the pre-publish event."""
-    with engine.begin() as conn:
-        logger.info(f"Saving cost calculation.")
-        conn.execute(
-            text(f"""
-                INSERT INTO mercadolibre.selling_calculation (
-                  item_id,
-                  category_id,
-                  sale_fee_amount,
-                  fixed_fee,
-                  financing_add_on_fee,
-                  meli_percentage_fee,
-                  percentage_fee,
-                  gross_amount,
-                  listing_fixed_fee,
-                  listing_gross_amount,
-                  ship_cost_amount,
-                  ship_discount,
-                  ship_cost_full_amount,
-                  total_selling_cost)
+def upsert_method(data:dict, schema:str, table:str):
+    """Dinamic Upsert Method.
 
-                VALUES (
-                    :item_id,
-                    :category_id,
-                    :sale_fee_amount,
-                    :fixed_fee,
-                    :financing_add_on_fee,
-                    :meli_percentage_fee,
-                    :percentage_fee,
-                    :gross_amount,
-                    :listing_fixed_fee,
-                    :listing_gross_amount,
-                    :ship_cost_amount,
-                    :ship_discount,
-                    :ship_cost_full_amount,
-                    :ship_cost_amount + :sale_fee_amount) ON DUPLICATE KEY UPDATE
-                category_id= :category_id,
-                sale_fee_amount= :sale_fee_amount,
-                fixed_fee= :fixed_fee,
-                financing_add_on_fee= :financing_add_on_fee,
-                meli_percentage_fee= :meli_percentage_fee,
-                percentage_fee= :percentage_fee,
-                gross_amount= :gross_amount,
-                listing_fixed_fee= :listing_fixed_fee,
-                listing_gross_amount= :listing_gross_amount,
-                ship_cost_amount= :ship_cost_amount,
-                ship_discount= :ship_discount,
-                ship_cost_full_amount= :ship_cost_full_amount,
-                total_selling_cost= :ship_cost_amount + :sale_fee_amount
-            """),cost_detail) 
-        logger.info("Load Completed.")
+        Attributes:
+            data: dict, with the fields and values.
+            in db, and the values required. (note, first key value would always be take as ID)
+            schema: str, name of the schema in db.
+            table: str, name of the table in db.
+    """
 
-
-def load_ai_response(item_id, field ,ai_response):
-    """writting field description or title using ai reply,
-    this is part from the pre-publish event."""
-    with engine.begin() as conn:
-        logger.info(f"Saving {field} for item: {item_id}.")
-        conn.execute(
-            text(f"""
-                UPDATE {SCHEMA_APP_PRODUCT_SYNC}.product_catalog_sync SET 
-                {field} = :ai_response
-                WHERE id = {item_id}
-            """),ai_response) 
-        logger.info("Load Completed.")
-
-
-def load_failed_status(item_id, item_metadata):
-    with engine.begin() as conn:
-        logger.info(f"Saving status & reason for item: {item_id}.")
-        conn.execute(
-            text(f"""
-                UPDATE {SCHEMA_APP_PRODUCT_SYNC}.product_catalog_sync SET 
-                 status = :status,
-                 reason = :reason
-                WHERE id = {item_id}
-            """),item_metadata) 
-        logger.info("Load Completed.")
-
-
-def load_meli_data(item_id, item_metadata):
-    with engine.begin() as conn:
-        logger.info(f"Saving Meli data: {item_id}.")
-        conn.execute(
-            text(f"""
-                UPDATE {SCHEMA_APP_PRODUCT_SYNC}.product_catalog_sync 
-                SET 
-                 meli_id = :meli_id,
-                 permalink = :permalink,
-                 status = :status,
-                 reason = :reason,
-                 remedy = :remedy
-                WHERE id = {item_id}
-            """),item_metadata) 
-        logger.info("Load Completed.")
-
-#//////////////MELI ORDERS LOGIC//////////////
-
-def get_order(order_id, platform):
-    """Checking if order exists in DB
-    Returns True if exists otherwise False."""
-    with engine.begin() as conn:
-        logger.info(f"Getting order from orders table in {platform}.")
-        result = conn.execute(
-            text(f"""
-                SELECT
-                id
-                FROM {platform}.orders
-                WHERE id = {order_id};
-            """)
-        )
     try:
-        if [dict(row) for row in result.mappings()][0]:
-            return True
-        else:
-            return False
-    except:
-        return False
+        with engine.begin() as conn:
+            fields = [i for i in data.keys()]
+            logger.info("Preparing Data to Upsert.")
+            aux_query = ""
+            values = ""
+            
+            def _casting_value(field):
+                value = data.get(field).get('value')
+                value_type = data.get(field).get('type')
+                if value_type == 'boolean':
+                    return str(value)
+                elif value_type == 'null':
+                    return 'null'
+                else:
+                    return f"CAST('{value}' AS {value_type})"
+            
+            for field in fields:
+                value = data.get(field)
+                if field == fields[0]:
+                    values += _casting_value(field) + ", "
+                    id_val = data.get(field).get('value')
+                    continue
+                if field == fields[-1]:
+                    value_casted = _casting_value(field)
+                    values += value_casted
+                    aux_query+= f"{field} = {value_casted}"
+                else:
+                    value_casted = _casting_value(field)
+                    values += f"{value_casted}, "
+                    aux_query+= f"{field} = {value_casted}, "
+            
+            logger.info(f"Upsert of Record {id_val} on {schema}.{table}")
+            conn.execute(text(f"""
+                INSERT INTO {schema}.{table} ({', '.join(fields)})
+                VALUES ({values})
+                ON DUPLICATE KEY UPDATE
+                {aux_query}
+            """))
+            logger.info("Upsert Completed.")
 
-def insert_order(order, platform):
-    with engine.begin() as conn:
-        logger.info(f"Saving order in orders table in {platform}.")
-        conn.execute(
-            text(f"""
-                INSERT IGNORE INTO {platform}.orders (id, data, created_at)
-                VALUES (:id, :data, :created_at)
-            """),order) 
-        logger.info("Load Completed.")
+    except Exception as e:
+        logger.error(f"Error during data load: {str(e)}")
+        raise e
+
 
 
 def update_method(data:dict, schema:str, table:str):
@@ -359,6 +281,8 @@ def update_method(data:dict, schema:str, table:str):
         value_type= data.get(field).get('type')
         if value_type == 'boolean':
             aux_query+= f"{field} = {value}"
+        elif value_type == 'null':
+            aux_query+= f"{field} = null"
         else:
             aux_query+= f"{field} = CAST('{value}' AS {value_type})"
 
@@ -391,6 +315,36 @@ def update_method(data:dict, schema:str, table:str):
         raise e
 
 
+def get_order(order_id, platform):
+    """Checking if order exists in DB
+    Returns True if exists otherwise False."""
+    with engine.begin() as conn:
+        logger.info(f"Getting order from orders table in {platform}.")
+        result = conn.execute(
+            text(f"""
+                SELECT
+                id
+                FROM {platform}.orders
+                WHERE id = {order_id};
+            """)
+        )
+    try:
+        if [dict(row) for row in result.mappings()][0]:
+            return True
+        else:
+            return False
+    except:
+        return False
+
+def insert_order(order, platform):
+    with engine.begin() as conn:
+        logger.info(f"Saving order in orders table in {platform}.")
+        conn.execute(
+            text(f"""
+                INSERT IGNORE INTO {platform}.orders (id, data, created_at)
+                VALUES (:id, :data, :created_at)
+            """),order) 
+        logger.info("Load Completed.")
 
 
 def db_tiendanube_category(operation:str, data:str):
