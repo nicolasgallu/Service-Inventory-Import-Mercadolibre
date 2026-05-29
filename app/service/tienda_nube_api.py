@@ -59,7 +59,12 @@ def aux_format_data(item_id):
             i['src'] = i['source']
             i.pop('source')
 
-    
+    category_id = data.get("category_id",None)
+    if  category_id == None:
+        category_id = 39076803
+
+
+
     if data.get("product_name_meli") == None:
         product_name = data.get("product_name")
     else:
@@ -75,7 +80,7 @@ def aux_format_data(item_id):
         "video_url": data.get("video_url", None),
         "images": public_images,
         "tags": data.get("tags", None),
-        "categories": [data.get("category_id",None)]
+        "categories": [category_id]
     }
     
     variant_data = [
