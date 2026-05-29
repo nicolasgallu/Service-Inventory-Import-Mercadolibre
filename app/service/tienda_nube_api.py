@@ -127,7 +127,7 @@ def tienda_nube_publish_item(item_id):
             return product_id, variant_id    
         else:
             logger.info("product failed to be published!")
-            logger.info(response.json())
+            logger.info(product_data)
             data = {
                 "attribute_id": attribute_id,
                 "product_id": None, 
