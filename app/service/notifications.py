@@ -13,7 +13,7 @@ def enviar_mensaje_whapi(token, telefono, mensaje):
         "authorization": f"Bearer {token}"
     }
     response = requests.post(url, json=payload, headers=headers)
-    logger.info("Whapi Response was: {response.text}")
+    logger.info(f"Whapi Response was: {response.text}")
 
     
 
