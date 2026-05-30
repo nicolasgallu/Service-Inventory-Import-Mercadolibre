@@ -584,7 +584,6 @@ def calculate_cost(item_data:dict, user_id:str, token:str):
     response = response.json()
     cost_detail = {
         'item_id':{'value': item_id, 'type':'char'},
-        'category_id':{'value':  category_id, 'type':'char'},
         'sale_fee_amount':{'value': response['sale_fee_amount'], 'type':'signed'}, 
         'fixed_fee':{'value':  response['sale_fee_details']['fixed_fee'], 'type':'signed'}, 
         'financing_add_on_fee':{'value':  response['sale_fee_details']['financing_add_on_fee'], 'type':'signed'}, 
