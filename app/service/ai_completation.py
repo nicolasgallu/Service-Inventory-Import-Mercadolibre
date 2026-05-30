@@ -1,9 +1,8 @@
 from app.utils.logger import logger
 from app.service.llm_api import call_deepseek_api
 from app.service.database import update_method, get_ai_prompt
-from app.settings.config import DS_API_KEY
 
-schema = 'guias_locales_testing'
+schema = 'app_import'
 table = 'product_catalog_sync'
 
 

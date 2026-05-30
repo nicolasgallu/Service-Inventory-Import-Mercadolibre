@@ -8,7 +8,8 @@ from app.service.notifications import enviar_mensaje_whapi
 from app.service.database import update_method, get_method, upsert_method
 from app.settings.config import TOKEN_WHAPI, PHONE_INTERNAL
 
-schema = 'guias_locales_testing'
+schema_inventory = 'app_import'
+schema_mercadolibre = 'guias_locales_testing'
 table = 'attributes'
 
 def ai_error_handling(api_response, user_message, item_id):
@@ -44,7 +45,7 @@ def ai_error_handling(api_response, user_message, item_id):
     
     logger.error(message)
     enviar_mensaje_whapi(TOKEN_WHAPI, PHONE_INTERNAL, message)
-    update_method(data, schema ,table)
+    update_method(data, schema_inventory ,table)
 
 
 def get_data_for_meli(item_id):
@@ -82,8 +83,8 @@ def get_data_for_meli(item_id):
             'b.warranty_time',
             'b.logistic_type'
         ],
-        'q_from':'FROM guias_locales_testing.product_catalog_sync as a',
-        'q_join':'LEFT JOIN guias_locales_testing.attributes as b on b.item_id = a.id',
+        'q_from':f'FROM {schema_inventory}.product_catalog_sync as a',
+        'q_join':f'LEFT JOIN {schema_mercadolibre}.attributes as b on b.item_id = a.id',
         'q_where': f'WHERE a.id = {item_id}',
         'q_limit':'LIMIT 1'
     }
@@ -188,7 +189,7 @@ def _generate_category_id(item_id, product_name, token):
                 'type': 'datetime'
             }
         }
-        update_method(data, schema ,table)  
+        update_method(data, schema_mercadolibre, table)  
         return category_id
     else:
         logger.error("Failed to create Category ID")
@@ -245,7 +246,7 @@ def _get_attributes(item_id, category_id, token):
             data['updated_at'] = {
                 'value': datetime.now(), 
                 'type': 'datetime'}
-            update_method(data, schema ,table)      
+            update_method(data, schema_mercadolibre, table)      
 
 
 def _get_allowed_values(item_id, category_id, price, token):
@@ -299,7 +300,7 @@ def _get_allowed_values(item_id, category_id, price, token):
     data['updated_at'] = {
         'value': datetime.now(), 
         'type': 'datetime'}
-    update_method(data, schema ,table)
+    update_method(data, schema_mercadolibre, table)
 
 
 def prepublish_product(item_data:dict, token:str):
@@ -363,7 +364,7 @@ def publish_item(item_data, public_images, token):
             'type': 'char'
             },
         }
-        update_method(data, schema ,table)
+        update_method(data, schema_inventory, table)
         return
     
     else:
@@ -524,7 +525,7 @@ def delete_item(item_data, token):
             'type': 'null'
             },
         }
-    update_method(data, schema ,table)
+    update_method(data, schema_inventory, table)
 
     
 def _set_description(meli_id, description, token, update=False):
@@ -614,4 +615,4 @@ def calculate_cost(item_data:dict, user_id:str, token:str):
     cost_detail['total_selling_cost'] = {'value': total_selling_cost, 'type': 'signed'}
     
     table = 'selling_calculation'
-    upsert_method(cost_detail, schema, table )
+    upsert_method(cost_detail, schema_mercadolibre, table )
