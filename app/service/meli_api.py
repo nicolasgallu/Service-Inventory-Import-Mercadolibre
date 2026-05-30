@@ -81,7 +81,8 @@ def get_data_for_meli(item_id):
             'b.local_pick_up',
             'b.warranty_type',
             'b.warranty_time',
-            'b.logistic_type'
+            'b.logistic_type',
+            'b.category_options'
         ],
         'q_from':f'FROM {schema_inventory}.product_catalog_sync as a',
         'q_join':f'LEFT JOIN {schema_mercadolibre}.attributes as b on b.item_id = a.id',
@@ -161,28 +162,29 @@ def _aux_product_format(item_data, public_images):
     return item_format
 
 
-def _generate_category_id(item_id, product_name, token):
+def _generate_category_options(item_id, product_name, token):
     """ Generate category ID trough Mercadolibre API.
         If Categoty already exists then returns None.
     """
     response = requests.get("https://api.mercadolibre.com/sites/MLA/domain_discovery/search", 
         params={
             "q": product_name, 
-            "limit": 1}, 
+            "limit": 6}, 
         headers={
             "Authorization": f"Bearer {token}"}
     )
+
     if response.status_code == 200:
-        category_id = response.json()[0].get("category_id")
-        logger.info(f"Category ID Generated: {category_id}")
+
+        logger.info(f"Category Options Generated")
         data = {
             'item_id': {
                 'value': item_id, 
                 'type': 'char'
             },
             'category_id': {
-                'value': category_id, 
-                'type': 'char'
+                'value': json.dumps(response.json()), 
+                'type': 'json'
             },
             'updated_at': {
                 'value': datetime.now(), 
@@ -190,9 +192,8 @@ def _generate_category_id(item_id, product_name, token):
             }
         }
         update_method(data, schema_mercadolibre, table)  
-        return category_id
     else:
-        logger.error("Failed to create Category ID")
+        logger.error(f"Failed to create Category Options {response.text}")
         return None
 
 
@@ -309,11 +310,13 @@ def prepublish_product(item_data:dict, token:str):
     item_id = item_data.get('id')
     product_name = item_data.get('product_name')
     price =  item_data.get("price_mercadolibre") if item_data.get("price_mercadolibre") else item_data.get("price")
-    category_id = item_data.get('category_id')
-    if category_id is None:
-        category_id = _generate_category_id(item_id, product_name, token)
-    _get_attributes(item_id, category_id, token)
-    _get_allowed_values(item_id, category_id, price, token)
+    category_options = item_data.get('category_options')
+    if category_options is None:
+        _generate_category_options(item_id, product_name, token)
+    else:
+        category_id = item_data.get('category_id')
+        _get_attributes(item_id, category_id, token)
+        _get_allowed_values(item_id, category_id, price, token)
 
 
 def publish_item(item_data, public_images, token):
