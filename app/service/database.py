@@ -1,7 +1,13 @@
 from sqlalchemy import create_engine, text
 from google.cloud.sql.connector import Connector
-from app.settings.config import INSTANCE_DB, USER_DB, PASSWORD_DB, NAME_DB
 from app.utils.logger import logger
+from app.settings.config import (
+    INSTANCE_DB, 
+    USER_DB, 
+    PASSWORD_DB, 
+    NAME_DB, 
+    SCHEMA_APP_PRODUCT_SYNC
+    )
 
 def getconn():
     connector = Connector() 
@@ -74,7 +80,7 @@ def get_tienda_nube_item_data(item_id):
                  c.variant_id,
                  d.category_id 
                  
-                FROM app_import.product_catalog_sync as a
+                FROM {SCHEMA_APP_PRODUCT_SYNC}.product_catalog_sync as a
                 LEFT JOIN (
                 SELECT 
                     id as attribute_id,
@@ -154,6 +160,34 @@ def delete_tienda_nube_product_status(data):
 
 
 
+def get_method(data):
+    """"""
+    with engine.begin() as conn:
+
+        q_columns = ', '.join(data.get('q_columns'))
+        q_from = data.get('q_from')
+        q_join = data.get('q_join', None)
+        q_where  = data.get('q_where', None)
+        q_limit  = data.get('q_limit', None)
+
+        result = conn.execute(
+            text(f"""
+                SELECT 
+                {q_columns} 
+                {q_from} 
+                {q_join} 
+                {q_where} 
+                {q_limit}
+                """)
+            )
+        data = [dict(row) for row in result.mappings()][0]
+        if data:
+            logger.info("Data extraction completed.")
+            return data
+        else:
+            logger.info("Data extraction failed.")
+            return None
+
 
 def get_item_data(item_id):
     """"""
@@ -161,7 +195,7 @@ def get_item_data(item_id):
         logger.info(f"Extracting data from item: {item_id}.")
         result = conn.execute(
             text(f"""
-                SELECT * FROM app_import.product_catalog_sync
+                SELECT * FROM {SCHEMA_APP_PRODUCT_SYNC}.product_catalog_sync
                 WHERE id = {item_id};
             """)
         )
@@ -174,105 +208,112 @@ def get_item_data(item_id):
             return None
 
 
-def load_selling_calculation(cost_detail):
-    """writting field description or title using ai reply,
-    this is part from the pre-publish event."""
-    with engine.begin() as conn:
-        logger.info(f"Saving cost calculation.")
-        conn.execute(
-            text(f"""
-                INSERT INTO mercadolibre.selling_calculation (
-                  item_id,
-                  category_id,
-                  sale_fee_amount,
-                  fixed_fee,
-                  financing_add_on_fee,
-                  meli_percentage_fee,
-                  percentage_fee,
-                  gross_amount,
-                  listing_fixed_fee,
-                  listing_gross_amount,
-                  ship_cost_amount,
-                  ship_discount,
-                  ship_cost_full_amount,
-                  total_selling_cost)
+def upsert_method(data:dict, schema:str, table:str):
+    """Dinamic Upsert Method.
 
-                VALUES (
-                    :item_id,
-                    :category_id,
-                    :sale_fee_amount,
-                    :fixed_fee,
-                    :financing_add_on_fee,
-                    :meli_percentage_fee,
-                    :percentage_fee,
-                    :gross_amount,
-                    :listing_fixed_fee,
-                    :listing_gross_amount,
-                    :ship_cost_amount,
-                    :ship_discount,
-                    :ship_cost_full_amount,
-                    :ship_cost_amount + :sale_fee_amount) ON DUPLICATE KEY UPDATE
-                category_id= :category_id,
-                sale_fee_amount= :sale_fee_amount,
-                fixed_fee= :fixed_fee,
-                financing_add_on_fee= :financing_add_on_fee,
-                meli_percentage_fee= :meli_percentage_fee,
-                percentage_fee= :percentage_fee,
-                gross_amount= :gross_amount,
-                listing_fixed_fee= :listing_fixed_fee,
-                listing_gross_amount= :listing_gross_amount,
-                ship_cost_amount= :ship_cost_amount,
-                ship_discount= :ship_discount,
-                ship_cost_full_amount= :ship_cost_full_amount,
-                total_selling_cost= :ship_cost_amount + :sale_fee_amount
-            """),cost_detail) 
-        logger.info("Load Completed.")
+        Attributes:
+            data: dict, with the fields and values.
+            in db, and the values required. (note, first key value would always be take as ID)
+            schema: str, name of the schema in db.
+            table: str, name of the table in db.
+    """
 
+    try:
+        with engine.begin() as conn:
+            fields = [i for i in data.keys()]
+            logger.info("Preparing Data to Upsert.")
+            aux_query = ""
+            values = ""
+            
+            def _casting_value(field):
+                value = data.get(field).get('value')
+                value_type = data.get(field).get('type')
+                if value_type == 'boolean':
+                    return str(value)
+                elif value_type == 'null':
+                    return 'null'
+                else:
+                    return f"CAST('{value}' AS {value_type})"
+            
+            for field in fields:
+                value = data.get(field)
+                if field == fields[0]:
+                    values += _casting_value(field) + ", "
+                    id_val = data.get(field).get('value')
+                    continue
+                if field == fields[-1]:
+                    value_casted = _casting_value(field)
+                    values += value_casted
+                    aux_query+= f"{field} = {value_casted}"
+                else:
+                    value_casted = _casting_value(field)
+                    values += f"{value_casted}, "
+                    aux_query+= f"{field} = {value_casted}, "
+            
+            logger.info(f"Upsert of Record {id_val} on {schema}.{table}")
+            conn.execute(text(f"""
+                INSERT INTO {schema}.{table} ({', '.join(fields)})
+                VALUES ({values})
+                ON DUPLICATE KEY UPDATE
+                {aux_query}
+            """))
+            logger.info("Upsert Completed.")
 
-def load_ai_response(item_id, field ,ai_response):
-    """writting field description or title using ai reply,
-    this is part from the pre-publish event."""
-    with engine.begin() as conn:
-        logger.info(f"Saving {field} for item: {item_id}.")
-        conn.execute(
-            text(f"""
-                UPDATE app_import.product_catalog_sync SET 
-                {field} = :ai_response
-                WHERE id = {item_id}
-            """),ai_response) 
-        logger.info("Load Completed.")
+    except Exception as e:
+        logger.error(f"Error during data load: {str(e)}")
+        raise e
 
 
-def load_failed_status(item_id, item_metadata):
-    with engine.begin() as conn:
-        logger.info(f"Saving status & reason for item: {item_id}.")
-        conn.execute(
-            text(f"""
-                UPDATE app_import.product_catalog_sync SET 
-                 status = :status,
-                 reason = :reason
-                WHERE id = {item_id}
-            """),item_metadata) 
-        logger.info("Load Completed.")
 
+def update_method(data:dict, schema:str, table:str):
+    """Dinamic Update Method.
 
-#LOGICA PARA ESCRIBIR MELI ID
-def load_meli_data(item_id, item_metadata):
-    with engine.begin() as conn:
-        logger.info(f"Saving Meli data: {item_id}.")
-        conn.execute(
-            text(f"""
-                UPDATE app_import.product_catalog_sync SET 
-                 meli_id = :meli_id,
-                 permalink = :permalink,
-                 status = :status,
-                 reason = :reason,
-                 remedy = :remedy
-                WHERE id = {item_id}
-            """),item_metadata) 
-        logger.info("Load Completed.")
+        Attributes:
+            data: dict, with the fields and values.
+            in db, and the values required. (note, first key value would always be take as ID)
+            schema: str, name of the schema in db.
+            table: str, name of the table in db.
+    """
+    aux_query = ""
+    def _casting_value(field, data):
+        nonlocal aux_query
+        value= data.get(field).get('value')
+        value_type= data.get(field).get('type')
+        if value_type == 'boolean':
+            aux_query+= f"{field} = {value}"
+        elif value_type == 'null':
+            aux_query+= f"{field} = null"
+        else:
+            aux_query+= f"{field} = CAST('{value}' AS {value_type})"
 
-#//////////////MELI ORDERS LOGIC//////////////
+    try:
+        with engine.begin() as conn:
+            fields = [i for i in data.keys()]
+                       
+            logger.info("Preparing Data to update.")
+            for field in fields:
+                if field == fields[0]:
+                    id_field = field
+                    id_val = data.get(field).get('value')
+
+                elif field == fields[-1]:
+                    _casting_value(field, data)
+                else:
+                    _casting_value(field, data)
+                    aux_query+=","
+            
+            logger.info(f"Updating Record {id_val} on {schema}.{table}")
+            conn.execute(text(f"""
+                UPDATE {schema}.{table}
+                SET {aux_query}
+                WHERE {id_field} = {id_val}
+            """))
+            logger.info("Update Completed.")
+
+    except Exception as e:
+        logger.error(f"Error during data load: {str(e)}")
+        raise e
+
 
 def get_order(order_id, platform):
     """Checking if order exists in DB
@@ -292,7 +333,6 @@ def get_order(order_id, platform):
             return True
         else:
             return False
-
     except:
         return False
 
@@ -305,6 +345,7 @@ def insert_order(order, platform):
                 VALUES (:id, :data, :created_at)
             """),order) 
         logger.info("Load Completed.")
+
 
 def db_tiendanube_category(operation:str, data:str):
     """
@@ -333,7 +374,6 @@ def db_tiendanube_category(operation:str, data:str):
                     INSERT IGNORE INTO tienda_nube.categories (id, name, data)
                     VALUES (:id, :name, :data)
                 """),data) 
-            
         logger.info(f"Operation {operation} Completed.")
 
 def get_bitcram_data(meli_id):
@@ -345,7 +385,7 @@ def get_bitcram_data(meli_id):
                 SELECT
                 id,
                 cost
-                FROM app_import.product_catalog_sync
+                FROM {SCHEMA_APP_PRODUCT_SYNC}.product_catalog_sync
                 WHERE meli_id = '{meli_id}';
             """)
         )
