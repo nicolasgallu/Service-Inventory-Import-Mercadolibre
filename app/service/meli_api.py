@@ -182,7 +182,7 @@ def _generate_category_options(item_id, product_name, token):
                 'value': item_id, 
                 'type': 'char'
             },
-            'category_id': {
+            'category_options': {
                 'value': json.dumps(response.json()), 
                 'type': 'json'
             },
