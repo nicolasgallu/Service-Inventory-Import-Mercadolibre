@@ -9,7 +9,7 @@ from app.service.database import update_method, get_method, upsert_method
 from app.settings.config import TOKEN_WHAPI, PHONE_INTERNAL
 
 schema_inventory = 'app_import'
-schema_mercadolibre = 'guias_locales_testing'
+schema_mercadolibre = 'mercadolibre'
 table = 'attributes'
 
 def ai_error_handling(api_response, user_message, item_id):
