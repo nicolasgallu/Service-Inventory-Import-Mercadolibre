@@ -313,10 +313,29 @@ def prepublish_product(item_data:dict, token:str):
     category_options = item_data.get('category_options')
     if category_options is None:
         _generate_category_options(item_id, product_name, token)
-    else:
-        category_id = item_data.get('category_id')
+
+    category_id = item_data.get('category_id')
+    if category_id is not None:
         _get_attributes(item_id, category_id, token)
         _get_allowed_values(item_id, category_id, price, token)
+    else:
+        table = 'attributes'
+        msg = json.dumps([{'Error': 'Es necesario seleccionar una categoria.'}])
+        data = {
+        'item_id': {
+            'value': item_id, 
+            'type': 'char'
+            },
+        'not_mapped_attributes': {
+            'value': msg, 
+            'type': 'json'
+            },
+        'allowed_options': {
+            'value': msg, 
+            'type': 'json'
+            },
+        }
+        update_method(data, schema_mercadolibre, table)
 
 
 def publish_item(item_data, public_images, token):
