@@ -313,6 +313,7 @@ def prepublish_product(item_data:dict, token:str):
     category_options = item_data.get('category_options')
     if category_options is None:
         _generate_category_options(item_id, product_name, token)
+        return
 
     category_id = item_data.get('category_id')
     if category_id is not None:
