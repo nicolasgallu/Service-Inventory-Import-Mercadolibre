@@ -335,6 +335,10 @@ def prepublish_product(item_data:dict, token:str):
             'value': msg, 
             'type': 'json'
             },
+        'updated_at': {
+                'value': datetime.now(), 
+                'type': 'datetime'
+            }
         }
         update_method(data, schema_mercadolibre, table)
 
