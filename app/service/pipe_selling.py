@@ -42,7 +42,7 @@ def pipeline_selling(order_id, platform):
                     data = get_bitcram_data(meli_id)
                     id = data.get('id')
                     insert_order(order, platform)
-                    sell_workflow(id, quantity, unit_price)
+                    sell_workflow(order_id, id, quantity, unit_price)
 
             else:
                 logger.error(f"Error processing the order: {response.json()}")
@@ -75,7 +75,7 @@ def pipeline_selling(order_id, platform):
                 data = get_tienda_nube_id(product_id)
                 id = data.get('id')
                 insert_order(order, platform)
-                sell_workflow(id, quantity, price)
+                sell_workflow(order_id, id, quantity, price)
 
             else:
                 logger.error(f"Error processing the order: {response.json()}")

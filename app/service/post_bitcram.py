@@ -6,7 +6,7 @@ from app.service.notifications import enviar_mensaje_whapi
 from app.service.secrets import bitcram_secrets
 
 
-def sell_workflow(target_product_id, quantity, price):
+def sell_workflow(order_id, target_product_id, quantity, price):
 
     headers = {"Authorization": f"Bearer {bitcram_secrets()}"}
 
@@ -15,7 +15,7 @@ def sell_workflow(target_product_id, quantity, price):
     response = post_sell(commercial_doc, headers)
     if response is True:
         current_stock = get_current_stock(target_product_id, warehouse_id, headers)
-        notify_sell(target_product_id, previous_stock, current_stock)
+        notify_sell(order_id, target_product_id, previous_stock, current_stock)
 
 def get_current_stock(p_id, w_id, headers):
     response = requests.get(
@@ -142,12 +142,12 @@ def post_sell (commercial_doc, headers):
         return True
 
 
-def notify_sell(target_product_id, previous_stock, current_stock):
+def notify_sell(order_id, target_product_id, previous_stock, current_stock):
 
     message_before = f"[STOCK] del item: '{target_product_id}' antes de la venta: {previous_stock}"
     message_after = f"[STOCK] del item:'{target_product_id}' después de la venta: {current_stock}"
     logger.info(message_before)  
     logger.info(message_after)
-    message_complete = 'meli_order_id: ' + str(target_product_id) + '\n' + message_before + '\n' + message_after
+    message_complete = 'meli_order_id: ' + str(order_id) + '\n' + message_before + '\n' + message_after
     enviar_mensaje_whapi(TOKEN_WHAPI, PHONE_INTERNAL, message_complete)
     return None
