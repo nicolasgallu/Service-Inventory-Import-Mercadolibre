@@ -10,6 +10,7 @@ from app.settings.config import TOKEN_WHAPI, PHONE_INTERNAL
 
 schema_inventory = 'app_import'
 schema_mercadolibre = 'mercadolibre'
+
 table = 'attributes'
 
 def ai_error_handling(api_response, user_message, item_id):
@@ -82,7 +83,8 @@ def get_data_for_meli(item_id):
             'b.warranty_type',
             'b.warranty_time',
             'b.logistic_type',
-            'b.category_options'
+            'b.category_options',
+            'b.ink_color'
         ],
         'q_from':f'FROM {schema_inventory}.product_catalog_sync as a',
         'q_join':f'LEFT JOIN {schema_mercadolibre}.attributes as b on b.item_id = a.id',
@@ -153,11 +155,19 @@ def _aux_product_format(item_data, public_images):
     
     volume_cap = item_data.get('volume_capacity')
     if volume_cap:
-        volume_cap = {
+        volume_cap_data = {
             "id": "VOLUME_CAPACITY", 
             "value_name": str(volume_cap) + ' mL'
         }
-        item_format['attributes'].append(volume_cap)
+        item_format['attributes'].append(volume_cap_data)
+    
+    ink_color = item_data.get('ink_color')
+    if ink_color:
+        ink_color_data = {
+            "id": "INK_COLOR", 
+            "value_name": ink_color
+        }
+        item_format['attributes'].append(ink_color_data)
 
     return item_format
 
@@ -204,7 +214,8 @@ def _get_attributes(item_id, category_id, token):
         'units_per_pack_required',
         'value_added_tax_required',
         'import_duty_required',
-        'empty_gtin_reason_required'
+        'empty_gtin_reason_required',
+        'ink_color_required'
     ]
     internal_avoided_req = [
         'brand_required',
@@ -359,7 +370,7 @@ def publish_item(item_data, public_images, token):
     response = requests.post("https://api.mercadolibre.com/items", 
                     json=item_format,
                     headers={"Authorization": f"Bearer {token}"})
-    
+        
     if response.status_code < 300:
         logger.info("Publishing Item Done Succesfully.")
         meli_id = response.json().get('id')
