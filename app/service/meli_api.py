@@ -13,6 +13,7 @@ schema_mercadolibre = 'mercadolibre'
 
 table = 'attributes'
 
+
 def ai_error_handling(api_response, user_message, item_id):
     table = 'product_catalog_sync'
     sys_prompt = """Tu tarea es procesar una respuesta json
@@ -84,7 +85,10 @@ def get_data_for_meli(item_id):
             'b.warranty_time',
             'b.logistic_type',
             'b.category_options',
-            'b.ink_color'
+            'b.ink_color',
+            'b.pot_type',
+            'b.product_type'
+
         ],
         'q_from':f'FROM {schema_inventory}.product_catalog_sync as a',
         'q_join':f'LEFT JOIN {schema_mercadolibre}.attributes as b on b.item_id = a.id',
@@ -93,7 +97,6 @@ def get_data_for_meli(item_id):
     }
     item_data = get_method(query)
     return item_data
-
 
 def _aux_product_format(item_data, public_images):
     """"""
@@ -169,6 +172,22 @@ def _aux_product_format(item_data, public_images):
         }
         item_format['attributes'].append(ink_color_data)
 
+    pot_type = item_data.get('pot_type')
+    if pot_type:
+        pot_type_data = {
+            "id": "POT_TYPE", 
+            "value_name": pot_type
+        }
+        item_format['attributes'].append(pot_type_data)
+
+    product_type = item_data.get('product_type')
+    if product_type:        
+        product_type_data = {
+            "id": "PRODUCT_TYPE", 
+            "value_name": product_type
+        }
+        item_format['attributes'].append(product_type_data)
+
     return item_format
 
 
@@ -215,7 +234,9 @@ def _get_attributes(item_id, category_id, token):
         'value_added_tax_required',
         'import_duty_required',
         'empty_gtin_reason_required',
-        'ink_color_required'
+        'ink_color_required',
+        'pot_type_required',
+        'product_type_required',
     ]
     internal_avoided_req = [
         'brand_required',
@@ -260,7 +281,6 @@ def _get_attributes(item_id, category_id, token):
                 'type': 'datetime'}
             update_method(data, schema_mercadolibre, table)      
 
-
 def _get_allowed_values(item_id, category_id, price, token):
     """Get allowed values for Sale Terms, Shipping and Listing Prices"""
     headers = {"Authorization": f"Bearer {token}"}
@@ -292,26 +312,82 @@ def _get_allowed_values(item_id, category_id, price, token):
         for p in res_prices
     ]
 
+    url_attributes = f"https://api.mercadolibre.com/categories/{category_id}/attributes"
+    res_attributes = requests.get(url_attributes, headers=headers).json()
+
+    required_attributes_data = {}
+
+    excluded_required_attributes = {
+        "GTIN",
+        "BRAND",
+        "IMPORT_DUTY",
+        "VALUE_ADDED_TAX",
+        "EMPTY_GTIN_REASON"
+    }
+
+    for attr in res_attributes:
+        tags = attr.get("tags", {})
+
+        is_required = (
+            tags.get("required") is True
+            or tags.get("catalog_required") is True
+            or tags.get("conditional_required") is True
+            or tags.get("required_if") is True
+        )
+
+        if not is_required:
+            continue
+
+        attr_id = attr.get("id")
+
+        # NUEVO: excluir atributos que no querés sumar
+        if attr_id in excluded_required_attributes:
+            continue
+
+        # Evita duplicar con lo previo: warranty ya viene desde sale_terms
+        if attr_id in warranty_data:
+            continue
+
+        if attr.get("value_type") == "list":
+            values = [
+                v.get("name")
+                for v in attr.get("values", [])
+                if v.get("name") is not None
+            ]
+        else:
+            values = f"Entrada libre ({attr.get('value_type')})"
+
+        required_attributes_data[attr_id] = {
+            "name": attr.get("name"),
+            "value_type": attr.get("value_type"),
+            "values": values
+        }
+
     category_metadata = {
         "category_id": category_id,
         "settings": {
             "warranty": warranty_data,
             "shipping": shipping_data,
-            "listing_options": prices_data
+            "listing_options": prices_data,
+            "required_attributes": required_attributes_data
         }
     }
+
     data = {
         'item_id': {
             'value': item_id, 
             'type': 'char'
             }
         }
+
     data['allowed_options'] = {
         'value': json.dumps(category_metadata, ensure_ascii=False), 
         'type': 'json'}
+
     data['updated_at'] = {
         'value': datetime.now(), 
         'type': 'datetime'}
+
     update_method(data, schema_mercadolibre, table)
 
 
