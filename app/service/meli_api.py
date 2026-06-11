@@ -19,6 +19,7 @@ def ai_error_handling(api_response, user_message, item_id):
     de un error retornado por la API de MercadoLibre, y devolver, en español un 
     formato mas limpio y corto para que el usuario no-tech pueda entenderlo mejor.
     Rule: Usa menos de 255 caracteres.
+    Rule: Elimina cualquier tipo de comilla simple u doble.
     """
     logger.info("Improving Error message with AI and sending.")
     user_prompt = api_response.json()
