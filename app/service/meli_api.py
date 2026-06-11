@@ -97,7 +97,10 @@ def get_data_for_meli(item_id):
             'b.capacity',
             'b.power_supply_type',
             'b.grading',
-            'b.with_usb'
+            'b.with_usb',
+            'b.size',
+            'b.color',
+            'b.gender'
 
 
         ],
@@ -188,7 +191,10 @@ def _aux_product_format(item_data, public_images):
         'capacity',
         'power_supply_type',
         'grading',
-        'with_usb'
+        'with_usb',
+        'size',
+        'color',
+        'gender'
     ]
 
     for i in new_attr:
@@ -261,6 +267,9 @@ def _get_attributes(item_id, category_id, token):
         'power_supply_type_required',
         'with_usb_required',
         'grading_required',
+        'size_required',
+        'color_required',
+        'gender_required',
     ]
     internal_avoided_req = [
         'brand_required',
