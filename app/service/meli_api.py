@@ -13,7 +13,6 @@ schema_mercadolibre = 'mercadolibre'
 
 table = 'attributes'
 
-
 def ai_error_handling(api_response, user_message, item_id):
     table = 'product_catalog_sync'
     sys_prompt = """Tu tarea es procesar una respuesta json
@@ -87,7 +86,18 @@ def get_data_for_meli(item_id):
             'b.category_options',
             'b.ink_color',
             'b.pot_type',
-            'b.product_type'
+            'b.product_type',
+            'b.output_connectors',
+            'b.surveillance_camera_type',
+            'b.camera_locations',
+            'b.cable_and_adapter_type',
+            'b.data_storage_capacity',
+            'b.usb_port_version',
+            'b.capacity',
+            'b.power_supply_type',
+            'b.grading',
+            'b.with_usb'
+
 
         ],
         'q_from':f'FROM {schema_inventory}.product_catalog_sync as a',
@@ -164,29 +174,32 @@ def _aux_product_format(item_data, public_images):
         }
         item_format['attributes'].append(volume_cap_data)
     
-    ink_color = item_data.get('ink_color')
-    if ink_color:
-        ink_color_data = {
-            "id": "INK_COLOR", 
-            "value_name": ink_color
-        }
-        item_format['attributes'].append(ink_color_data)
+    new_attr = [
+        'ink_color',
+        'pot_type',
+        'product_type',
+        'output_connectors',
+        'surveillance_camera_type',
+        'camera_locations',
+        'cable_and_adapter_type',
+        'data_storage_capacity',
+        'usb_port_version',
+        'capacity',
+        'power_supply_type',
+        'grading',
+        'with_usb'
+    ]
 
-    pot_type = item_data.get('pot_type')
-    if pot_type:
-        pot_type_data = {
-            "id": "POT_TYPE", 
-            "value_name": pot_type
-        }
-        item_format['attributes'].append(pot_type_data)
+    for i in new_attr:
+        value = item_data.get(i) 
+        if value:
+            id = i.upper()
+            new_attribute = {
+                "id": id,
+                "value_name": value
+            }
+            item_format['attributes'].append(new_attribute)
 
-    product_type = item_data.get('product_type')
-    if product_type:        
-        product_type_data = {
-            "id": "PRODUCT_TYPE", 
-            "value_name": product_type
-        }
-        item_format['attributes'].append(product_type_data)
 
     return item_format
 
@@ -237,6 +250,16 @@ def _get_attributes(item_id, category_id, token):
         'ink_color_required',
         'pot_type_required',
         'product_type_required',
+        'output_connectors_required',
+        'surveillance_camera_type_required',
+        'camera_locations_required',
+        'cable_and_adapter_type_required',
+        'data_storage_capacity_required',
+        'usb_port_version_required',
+        'capacity_required',
+        'power_supply_type_required',
+        'with_usb_required',
+        'grading_required',
     ]
     internal_avoided_req = [
         'brand_required',
