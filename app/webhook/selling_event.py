@@ -3,42 +3,42 @@ from flask import Blueprint, request, jsonify
 from app.service.pipe_selling import pipeline_selling
 import threading
 
+memory = set()
+memory_lock = threading.Lock()
 
-def run_process(order_id, platform):
-    global orders
+def run_pipe_selling(order_id, platform):
     pipeline_selling(order_id, platform)
-    orders = []
-    
-orders = []
+    with memory_lock:
+        logger.info(f"Removing from memory: {order_id}")
+        memory.remove(order_id)
 
 meli_sell = Blueprint("wh_sell", __name__, url_prefix="/webhooks/sells")
 @meli_sell.route("", methods=["POST"], strict_slashes=False)
 def main():
     data = request.json
-    logger.info(f"AUX: data from webhook/sells: {data}")
 
-    if 'topic' in data:
-        if data.get('topic') == 'orders_v2':
-            order_id = data.get('resource').split("/")[2]
-            if order_id not in orders:
-                orders.append(order_id)
-                thread = threading.Thread(target=run_process, args=(order_id, 'mercadolibre'))
-                thread.start()
-                return jsonify({"status": "accepted", "message": "Meli Selling Event"}), 202
-            else:
-                return jsonify({"status": "ignores", "message": "message wasnt a sell"}), 200
-        else: 
-            return jsonify({"status": "ignores", "message": "message wasnt a sell"}), 200
-
+    if 'topic' in data and data.get('topic') == 'orders_v2':
+        data = {
+            'platform': 'mercadolibre',
+            'order_id': data.get('resource').split("/")[2]
+        }
     elif 'store_id' in data:
-        order_id = data.get('id')
-        if order_id not in orders:
-            orders.append(order_id)
-            thread = threading.Thread(target=run_process, args=(order_id, 'tienda_nube'))
-            thread.start()
-            return jsonify({"status": "accepted", "message": "TiendaNube Selling Event"}), 202
-        else:
-            return jsonify({"status": "ignores", "message": "message wasnt a sell"}), 200
+        data = {
+            'platform': 'tienda_nube',
+            'order_id': data.get('id')
+        }
     else:
-        return jsonify({"status": "ignores", "message": "message wasnt a sell"}), 200
-    
+        logger.info("Sell Webhook: Event Rejected [not a sell]")
+        return jsonify({"status": "ignores", "message": "event rejected"}), 200
+
+    order_id = data.get('order_id')
+    platform = data.get('platform')
+    if order_id not in memory:
+        memory.add(order_id)
+        thread = threading.Thread(target=run_pipe_selling, args=(order_id, platform))
+        thread.start()
+        logger.info("Sell Webhook: Event Accepted [new order]")
+        return jsonify({"status": "accepted", "message": "event received"}), 200
+    else:
+        logger.info("Sell Webhook: Event Rejected [already in pipeline]")
+        return jsonify({"status": "ignores", "message": "event rejected"}), 200
