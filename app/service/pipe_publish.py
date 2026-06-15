@@ -16,6 +16,9 @@ def pipeline_publish(response):
     if event_type == 'pre-publish':
         logger.info("Pre-Publish Notification.")
         item_data = get_data_for_meli(item_id)
+        if item_data.get('meli_id'):
+            logger.info("Product already published, nothing to do.")
+            return
         ai_call_prepublish(data, item_data)
         token = meli_secrets()
         prepublish_product(item_data, token)
@@ -30,7 +33,7 @@ def pipeline_publish(response):
                 tienda_nube_publish_item(item_id)
             elif event_type == "update":
                 tienda_nube_update_item(item_id)
-            return
+        return
 
     else:
         logger.info("Meli Product Notification")
@@ -40,6 +43,7 @@ def pipeline_publish(response):
             logger.info("executing mvp meli pictures job")
             mvp_meli_pictures(item_id)
             tienda_nube_update_item(item_id)
+            return
 
         elif event_type in ["publish", "update"]:
             public_images = process_images_storage(item_id)
@@ -50,9 +54,12 @@ def pipeline_publish(response):
                 publish_item(item_data, public_images, token)
             elif event_type == "update":
                 update_item(item_id, item_data, public_images, token)
+            return
 
         elif event_type == "pause":
             pause_item(item_data, token)
+            return
 
         elif event_type == "delete":
             delete_item(item_data, token)
+            return
