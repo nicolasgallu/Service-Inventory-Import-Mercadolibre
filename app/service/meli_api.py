@@ -102,7 +102,8 @@ def get_data_for_meli(item_id):
             'b.size',
             'b.color',
             'b.gender',
-            'b.name'
+            'b.name',
+            'b.iron_type'
 
 
         ],
@@ -197,7 +198,8 @@ def _aux_product_format(item_data, public_images):
         'size',
         'color',
         'gender',
-        'name'
+        'name',
+        'iron_type'
     ]
 
     for i in new_attr:
@@ -274,6 +276,7 @@ def _get_attributes(item_id, category_id, token):
         'color_required',
         'gender_required',
         'name_required',
+        'iron_type_required',
     ]
     internal_avoided_req = [
         'brand_required',
