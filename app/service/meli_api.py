@@ -100,7 +100,8 @@ def get_data_for_meli(item_id):
             'b.with_usb',
             'b.size',
             'b.color',
-            'b.gender'
+            'b.gender',
+            'b.name'
 
 
         ],
@@ -194,7 +195,8 @@ def _aux_product_format(item_data, public_images):
         'with_usb',
         'size',
         'color',
-        'gender'
+        'gender',
+        'name'
     ]
 
     for i in new_attr:
@@ -270,6 +272,7 @@ def _get_attributes(item_id, category_id, token):
         'size_required',
         'color_required',
         'gender_required',
+        'name_required',
     ]
     internal_avoided_req = [
         'brand_required',
