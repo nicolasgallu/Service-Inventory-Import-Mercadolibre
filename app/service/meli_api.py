@@ -18,6 +18,7 @@ def ai_error_handling(api_response, user_message, item_id):
     sys_prompt = """Tu tarea es procesar una respuesta json
     de un error retornado por la API de MercadoLibre, y devolver, en español un 
     formato mas limpio y corto para que el usuario no-tech pueda entenderlo mejor.
+    Rule: La respuesta debe de estar en formato de bulletpoints.
     Rule: Usa menos de 255 caracteres.
     Rule: Elimina cualquier tipo de comilla simple u doble.
     """
