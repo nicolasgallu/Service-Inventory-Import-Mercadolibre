@@ -435,7 +435,7 @@ def prepublish_product(item_data:dict, token:str):
     """"""
     logger.info("Runing Prepublish Examination")
     item_id = item_data.get('id')
-    product_name = item_data.get('product_name')
+    product_name =  item_data.get("product_name_meli") if item_data.get("product_name_meli") else item_data.get("product_name")
     price =  item_data.get("price_mercadolibre") if item_data.get("price_mercadolibre") else item_data.get("price")
     category_options = item_data.get('category_options')
     if category_options is None:
