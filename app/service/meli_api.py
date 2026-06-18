@@ -566,6 +566,7 @@ def update_item(item_id, item_data, public_images, token):
         del item_format['currency_id']
         del item_format['condition']
         del item_format['attributes']
+        del item_format['buying_mode']
         listing_type_id = item_format.get('listing_type_id')
         del item_format['listing_type_id']
 
