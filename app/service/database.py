@@ -390,7 +390,7 @@ def get_bitcram_data(meli_id):
                       a.cost,
                       1 as aux_priority 
                       from {SCHEMA_APP_PRODUCT_SYNC}.product_catalog_sync as a
-                      where '{meli_id}'
+                      where a.meli_id = '{meli_id}'
                       limit 1
                       ),
                     
