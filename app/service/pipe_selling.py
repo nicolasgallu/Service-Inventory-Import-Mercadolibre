@@ -9,7 +9,7 @@ import json
 
 def pipeline_selling(order_id, platform):
     """"""
-
+    
     logger.info(f"processing order {order_id} from {platform}")
 
     if get_order(order_id, platform):

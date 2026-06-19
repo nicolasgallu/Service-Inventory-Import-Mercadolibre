@@ -382,11 +382,51 @@ def get_bitcram_data(meli_id):
         logger.info(f"Extracting data from Meli_ID: {meli_id}.")
         result = conn.execute(
             text(f"""
-                SELECT
-                id,
-                cost
-                FROM {SCHEMA_APP_PRODUCT_SYNC}.product_catalog_sync
-                WHERE meli_id = '{meli_id}';
+                    with 
+                    first_match  as (
+                    select 
+                      a.meli_id,
+                      a.id,
+                      a.cost,
+                      1 as aux_priority 
+                      from {SCHEMA_APP_PRODUCT_SYNC}.product_catalog_sync as a
+                      where '{meli_id}'
+                      limit 1
+                      ),
+                    
+                    second_match as (
+                    
+                      select 
+                      a.meli_id,
+                      b.id,
+                      b.cost,
+                      2 as aux_priority 
+                      from mercadolibre.catalog_listing as a
+                      left join {SCHEMA_APP_PRODUCT_SYNC}.product_catalog_sync as b on a.meli_id = b.meli_id
+                      where a.catalog_product_id in (
+                        select catalog_product_id 
+                        from mercadolibre.catalog_listing 
+                        where meli_id = '{meli_id}') and b.id is not null
+                        limit 1
+                    ),
+                    
+                    final as (
+                      select * from first_match
+                      union all
+                      select * from second_match),
+                    
+                    ranked_results as (
+                      select 
+                        *,
+                        row_number() over(partition by meli_id order by aux_priority asc) as rn
+                      from final
+                    )
+                    
+                    select
+                    id,
+                    cost
+                    from ranked_results 
+                    where rn = 1
             """)
         )
         data = [dict(row) for row in result.mappings()][0]
