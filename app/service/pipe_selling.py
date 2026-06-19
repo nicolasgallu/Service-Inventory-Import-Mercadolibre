@@ -33,15 +33,15 @@ def pipeline_selling(order_id, platform):
                 created_at = order_data.get('date_created')
                 order_items = order_data.get('order_items', [])
                 order = {'id':order_id,'data': json.dumps(order_items) ,'created_at': created_at}
-                logger.info("Order Dict Created.")
-
+                logger.info("Order Dict Created. saving order in DB.")
+                insert_order(order, platform)
+                
                 for item_info in order_items:
                     meli_id = item_info.get('item', {}).get('id')
                     quantity = item_info.get('quantity')
                     unit_price = item_info.get('unit_price')
                     data = get_bitcram_data(meli_id)
                     id = data.get('id')
-                    insert_order(order, platform)
                     sell_workflow(order_id, id, quantity, unit_price)
 
             else:
@@ -70,11 +70,10 @@ def pipeline_selling(order_id, platform):
                 price = order_data.get('products')[0].get('price')
                 quantity = order_data.get('products')[0].get('quantity')
                 order = {'id':order_id,'data': json.dumps(order_info) ,'created_at': created_at}
-                logger.info("Order Dict Created.")
-
+                logger.info("Order Dict Created. saving order in DB.")
+                insert_order(order, platform)
                 data = get_tienda_nube_id(product_id)
                 id = data.get('id')
-                insert_order(order, platform)
                 sell_workflow(order_id, id, quantity, price)
 
             else:
