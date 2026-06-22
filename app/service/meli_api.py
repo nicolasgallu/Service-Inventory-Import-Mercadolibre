@@ -89,7 +89,7 @@ def get_data_for_meli(item_id):
             'b.ink_color',
             'b.pot_type',
             'b.product_type',
-            'b.output_connectors',
+            'b.output_connectors as output_connector',
             'b.surveillance_camera_type',
             'b.camera_locations',
             'b.cable_and_adapter_type',
@@ -103,7 +103,8 @@ def get_data_for_meli(item_id):
             'b.color',
             'b.gender',
             'b.name',
-            'b.iron_type'
+            'b.iron_type',
+            'b.input_connector'
 
 
         ],
@@ -185,7 +186,7 @@ def _aux_product_format(item_data, public_images):
         'ink_color',
         'pot_type',
         'product_type',
-        'output_connectors',
+        'output_connector',
         'surveillance_camera_type',
         'camera_locations',
         'cable_and_adapter_type',
@@ -199,7 +200,8 @@ def _aux_product_format(item_data, public_images):
         'color',
         'gender',
         'name',
-        'iron_type'
+        'iron_type',
+        'input_connector'
     ]
 
     for i in new_attr:
@@ -262,7 +264,8 @@ def _get_attributes(item_id, category_id, token):
         'ink_color_required',
         'pot_type_required',
         'product_type_required',
-        'output_connectors_required',
+        'output_connector_required',
+        'input_connector_required',
         'surveillance_camera_type_required',
         'camera_locations_required',
         'cable_and_adapter_type_required',
