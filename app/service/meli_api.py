@@ -104,7 +104,7 @@ def get_data_for_meli(item_id):
             'b.gender',
             'b.name',
             'b.iron_type',
-            'b.input_connector'
+            'b.input_connector',
             'b.thermal_container_type',
             'b.is_factory_kit',
             'b.pieces_number',
@@ -208,7 +208,7 @@ def _aux_product_format(item_data, public_images):
         'gender',
         'name',
         'iron_type',
-        'input_connector'
+        'input_connector',
         'thermal_container_type',
         'is_factory_kit',
         'pieces_number',
