@@ -105,7 +105,14 @@ def get_data_for_meli(item_id):
             'b.name',
             'b.iron_type',
             'b.input_connector'
-
+            'b.thermal_container_type',
+            'b.is_factory_kit',
+            'b.pieces_number',
+            'b.material',
+            'b.drinking_glass_product_type',
+            'b.makeup_format',
+            'b.eyeliner_type',
+            'b.backpack_type'
 
         ],
         'q_from':f'FROM {schema_inventory}.product_catalog_sync as a',
@@ -202,6 +209,15 @@ def _aux_product_format(item_data, public_images):
         'name',
         'iron_type',
         'input_connector'
+        'thermal_container_type',
+        'is_factory_kit',
+        'pieces_number',
+        'material',
+        'drinking_glass_product_type',
+        'makeup_format',
+        'eyeliner_type',
+        'backpack_type'
+
     ]
 
     for i in new_attr:
@@ -280,6 +296,15 @@ def _get_attributes(item_id, category_id, token):
         'gender_required',
         'name_required',
         'iron_type_required',
+        'thermal_container_type_required',
+        'is_factory_kit_required',
+        'pieces_number_required',
+        'material_required',
+        'drinking_glass_product_type_required',
+        'makeup_format_required',
+        'eyeliner_type_required',
+        'backpack_type_required',
+
     ]
     internal_avoided_req = [
         'brand_required',
