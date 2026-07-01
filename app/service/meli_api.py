@@ -154,8 +154,8 @@ def _aux_product_format(item_data, public_images):
         "attributes": [
             {"id": "BRAND", "value_name": item_data.get('brand')},
             {"id": "MODEL", "value_name": item_data.get('model')},
-            {"id": "VALUE_ADDED_TAX", "value_id": str(item_data.get('value_added_tax'))},
-            {"id": "IMPORT_DUTY", "value_id": str(item_data.get('import_duty'))},
+            {"id": "VALUE_ADDED_TAX", "value_name": item_data.get('value_added_tax')},
+            {"id": "IMPORT_DUTY", "value_name": item_data.get('import_duty')},
             {"id": "UNITS_PER_PACK", "value_name": item_data.get('units_per_pack')}
         ],
         "shipping": { 
