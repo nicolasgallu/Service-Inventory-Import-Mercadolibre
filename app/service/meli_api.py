@@ -566,6 +566,7 @@ def publish_item(item_data, public_images, token):
     
     else:
         user_message = f"Error while publishing item: {item_id}"
+        logger.info(response.json())
         ai_error_handling(response, user_message, item_id)
         return
 
