@@ -112,7 +112,12 @@ def get_data_for_meli(item_id):
             'b.drinking_glass_product_type',
             'b.makeup_format',
             'b.eyeliner_type',
-            'b.backpack_type'
+            'b.backpack_type',
+            'b.faucet_control_type',
+            'b.makeup_brushes_number',
+            'b.finish',
+            'b.lip_liner_type',
+            'b.board_game_name'
 
         ],
         'q_from':f'FROM {schema_inventory}.product_catalog_sync as a',
@@ -216,7 +221,12 @@ def _aux_product_format(item_data, public_images):
         'drinking_glass_product_type',
         'makeup_format',
         'eyeliner_type',
-        'backpack_type'
+        'backpack_type',
+        'faucet_control_type',
+        'makeup_brushes_number',
+        'finish',
+        'lip_liner_type',
+        'board_game_name'
 
     ]
 
@@ -304,6 +314,11 @@ def _get_attributes(item_id, category_id, token):
         'makeup_format_required',
         'eyeliner_type_required',
         'backpack_type_required',
+        'faucet_control_type_required',
+        'makeup_brushes_number_required',
+        'finish_required',
+        'lip_liner_type_required',
+        'board_game_name_required'
 
     ]
     internal_avoided_req = [
