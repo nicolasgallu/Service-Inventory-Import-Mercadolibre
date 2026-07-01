@@ -141,6 +141,37 @@ def _aux_product_format(item_data, public_images):
     else:
         price = item_data.get("price")
 
+
+    value_added_tax_ids = {
+        "0": "48405907",
+        "10.5": "48405908",
+        "21": "48405909",
+        "27": "48405910",
+    }
+
+    import_duty_ids = {
+        "0": "49553239",
+        "1": "49553240",
+        "2.5": "49553241",
+        "4": "49553242",
+        "5": "49553243",
+        "8": "49553244",
+        "9.5": "49553245",
+        "10": "49553246",
+        "14": "49553247",
+        "15": "49553248",
+        "18": "49553249",
+        "19": "49553250",
+        "20": "49553251",
+        "23": "49553252",
+        "25": "49553253",
+        "26": "49553254",
+        "70": "49553255"
+    }
+
+    value_added_tax = item_data.get('value_added_tax')
+    import_duty = item_data.get('import_duty')
+
     item_format = {
         "title": product_name, 
         "category_id": item_data.get('category_id'), 
@@ -154,9 +185,9 @@ def _aux_product_format(item_data, public_images):
         "attributes": [
             {"id": "BRAND", "value_name": item_data.get('brand')},
             {"id": "MODEL", "value_name": item_data.get('model')},
-            {"id": "VALUE_ADDED_TAX", "value_id": "48405909", "value_name": item_data.get('value_added_tax')},
-            {"id": "IMPORT_DUTY", "value_id": "49553239", "value_name": item_data.get('import_duty')},
-            {"id": "UNITS_PER_PACK", "value_name": item_data.get('units_per_pack')}
+            {"id": "UNITS_PER_PACK", "value_name": item_data.get('units_per_pack')},
+            {"id": "VALUE_ADDED_TAX","value_id": value_added_tax_ids.get(value_added_tax), "value_name": value_added_tax},
+            {"id": "IMPORT_DUTY", "value_id": import_duty_ids.get(import_duty), "value_name": import_duty},
         ],
         "shipping": { 
             "mode": item_data.get('mode_shipping'), 
