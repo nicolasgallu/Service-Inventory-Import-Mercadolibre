@@ -117,7 +117,17 @@ def get_data_for_meli(item_id):
             'b.makeup_brushes_number',
             'b.finish',
             'b.lip_liner_type',
-            'b.board_game_name'
+            'b.board_game_name',
+            'b.part_number',
+            'b.vehicle_type',
+            'b.voleyball_ground_type',
+            'b.scale',
+            'b.includes_assembly_manual',
+            'b.with_sound',
+            'b.roller_skates_size',
+            'b.roller_skates_type',
+            'b.with_brakes',
+            'b.age_group'
 
         ],
         'q_from':f'FROM {schema_inventory}.product_catalog_sync as a',
@@ -257,7 +267,17 @@ def _aux_product_format(item_data, public_images):
         'makeup_brushes_number',
         'finish',
         'lip_liner_type',
-        'board_game_name'
+        'board_game_name',
+        'part_number',
+        'vehicle_type',
+        'voleyball_ground_type',
+        'scale',
+        'includes_assembly_manual',
+        'with_sound',
+        'roller_skates_size',
+        'roller_skates_type',
+        'with_brakes',
+        'age_group'
 
     ]
 
@@ -349,7 +369,17 @@ def _get_attributes(item_id, category_id, token):
         'makeup_brushes_number_required',
         'finish_required',
         'lip_liner_type_required',
-        'board_game_name_required'
+        'board_game_name_required',
+        'part_number_required',
+        'vehicle_type_required',
+        'voleyball_ground_type_required',
+        'scale_required',
+        'includes_assembly_manual_required',
+        'with_sound_required',
+        'roller_skates_size_required',
+        'roller_skates_type_required',
+        'with_brakes_required',
+        'age_group_required'
 
     ]
     internal_avoided_req = [
