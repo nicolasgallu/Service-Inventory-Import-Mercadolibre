@@ -46,7 +46,8 @@ def pipeline_publish(response):
             return
 
         elif event_type in ["publish", "update"]:
-            public_images = process_images_storage(item_id)
+            #public_images = process_images_storage(item_id)
+            public_images=[]
             if public_images == []:
                 logger.info("Without images in Folder, using image from Bitcram.")
                 public_images = [{'source': item_data["product_image_b_format_url"]}]

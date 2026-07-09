@@ -70,12 +70,21 @@ def aux_format_data(item_id):
     else:
         product_name = data.get("product_name_meli")
 
+
+    all_settings_groups = json.loads(data.get("settings"))
+    for settings_group in all_settings_groups:
+        for section_name in settings_group:
+            if section_name == "shipping":
+                for variable in settings_group[section_name]:
+                    if variable.get('id') == 'FREE_SHIPPING':
+                        free_shipping = variable.get('user_input_value')
+
     product_data = {
         "name": {"es": product_name},
         "description": {"es": data.get("description", None)},
         "seo_title": {"es": product_name},
         "seo_description": {"es": data.get("seo_description", None)},
-        "free_shipping": False if data.get("free_shipping", False) == 0 else True,
+        "free_shipping": free_shipping if free_shipping else False,
         "brand": data.get("brand", None),
         "video_url": data.get("video_url", None),
         "images": public_images,

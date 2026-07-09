@@ -8,8 +8,11 @@ from app.service.notifications import enviar_mensaje_whapi
 from app.service.database import update_method, get_method, upsert_method
 from app.settings.config import TOKEN_WHAPI, PHONE_INTERNAL
 
-schema_inventory = 'app_import'
-schema_mercadolibre = 'mercadolibre'
+#schema_inventory = 'app_import'
+#schema_mercadolibre = 'mercadolibre'
+
+schema_inventory = 'guias_locales_testing'
+schema_mercadolibre = 'guias_locales_testing'
 
 table = 'attributes'
 
@@ -26,7 +29,6 @@ def ai_error_handling(api_response, user_message, item_id):
     user_prompt = api_response.json()
     error_clean = call_deepseek_api(sys_prompt, user_prompt)
     message = f"{user_message}:\n {error_clean}"
-    
     data = {
     'id': {
         'value': item_id, 
@@ -45,7 +47,6 @@ def ai_error_handling(api_response, user_message, item_id):
         'type': 'null'
         },
     }
-    
     logger.error(message)
     enviar_mensaje_whapi(TOKEN_WHAPI, PHONE_INTERNAL, message)
     update_method(data, schema_inventory ,table)
@@ -70,65 +71,12 @@ def get_data_for_meli(item_id):
             'a.product_name_meli',
             'a.meli_id',
             'a.price_mercadolibre',
-            'b.listing_type_id',
-            'b.free_shipping',
-            'b.mode_shipping',
-            'b.volume_capacity',
+            'b.category_options',
             'b.category_id',
             'b.currency_id',
             'b.buying_mode',
             'b.condition_type',
-            'b.value_added_tax',
-            'b.import_duty',
-            'b.units_per_pack',
-            'b.local_pick_up',
-            'b.warranty_type',
-            'b.warranty_time',
-            'b.logistic_type',
-            'b.category_options',
-            'b.ink_color',
-            'b.pot_type',
-            'b.product_type',
-            'b.output_connectors as output_connector',
-            'b.surveillance_camera_type',
-            'b.camera_locations',
-            'b.cable_and_adapter_type',
-            'b.data_storage_capacity',
-            'b.usb_port_version',
-            'b.capacity',
-            'b.power_supply_type',
-            'b.grading',
-            'b.with_usb',
-            'b.size',
-            'b.color',
-            'b.gender',
-            'b.name',
-            'b.iron_type',
-            'b.input_connector',
-            'b.thermal_container_type',
-            'b.is_factory_kit',
-            'b.pieces_number',
-            'b.material',
-            'b.drinking_glass_product_type',
-            'b.makeup_format',
-            'b.eyeliner_type',
-            'b.backpack_type',
-            'b.faucet_control_type',
-            'b.makeup_brushes_number',
-            'b.finish',
-            'b.lip_liner_type',
-            'b.board_game_name',
-            'b.part_number',
-            'b.vehicle_type',
-            'b.voleyball_ground_type',
-            'b.scale',
-            'b.includes_assembly_manual',
-            'b.with_sound',
-            'b.roller_skates_size',
-            'b.roller_skates_type',
-            'b.with_brakes',
-            'b.age_group'
-
+            'b.settings'
         ],
         'q_from':f'FROM {schema_inventory}.product_catalog_sync as a',
         'q_join':f'LEFT JOIN {schema_mercadolibre}.attributes as b on b.item_id = a.id',
@@ -137,6 +85,7 @@ def get_data_for_meli(item_id):
     }
     item_data = get_method(query)
     return item_data
+
 
 def _aux_product_format(item_data, public_images):
     """"""
@@ -151,63 +100,49 @@ def _aux_product_format(item_data, public_images):
     else:
         price = item_data.get("price")
 
-
     value_added_tax_ids = {
-        "0": "48405907",
-        "10.5": "48405908",
-        "21": "48405909",
-        "27": "48405910",
+        "0 %": "48405907",
+        "10.5 %": "48405908",
+        "21 %": "48405909",
+        "27 %": "48405910",
     }
-
     import_duty_ids = {
-        "0": "49553239",
-        "1": "49553240",
-        "2.5": "49553241",
-        "4": "49553242",
-        "5": "49553243",
-        "8": "49553244",
-        "9.5": "49553245",
-        "10": "49553246",
-        "14": "49553247",
-        "15": "49553248",
-        "18": "49553249",
-        "19": "49553250",
-        "20": "49553251",
-        "23": "49553252",
-        "25": "49553253",
-        "26": "49553254",
-        "70": "49553255"
+        "0 %": "49553239",
+        "1 %": "49553240",
+        "2.5 %": "49553241",
+        "4 %": "49553242",
+        "5 %": "49553243",
+        "8 %": "49553244",
+        "9.5 %": "49553245",
+        "10 %": "49553246",
+        "14 %": "49553247",
+        "15 %": "49553248",
+        "18 %": "49553249",
+        "19 %": "49553250",
+        "20 %": "49553251",
+        "23 %": "49553252",
+        "25 %": "49553253",
+        "26 %": "49553254",
+        "70 %": "49553255"
     }
-
-    value_added_tax = item_data.get('value_added_tax')
-    import_duty = item_data.get('import_duty')
+    
+    settings = json.loads(item_data.get('settings'))
 
     item_format = {
-        "title": product_name, 
+        "title": product_name,
         "category_id": item_data.get('category_id'), 
         "price": str(price), 
         "currency_id": 'ARS', 
         "available_quantity": item_data.get('stock'),
         "buying_mode": item_data.get('buying_mode'), 
         "condition": item_data.get('condition_type'),
-        "listing_type_id": item_data.get('listing_type_id'),
         "pictures": public_images, 
         "attributes": [
             {"id": "BRAND", "value_name": item_data.get('brand')},
             {"id": "MODEL", "value_name": item_data.get('model')},
-            {"id": "UNITS_PER_PACK", "value_name": item_data.get('units_per_pack')},
-            {"id": "VALUE_ADDED_TAX","value_id": value_added_tax_ids.get(value_added_tax), "value_name": value_added_tax},
-            {"id": "IMPORT_DUTY", "value_id": import_duty_ids.get(import_duty), "value_name": import_duty},
         ],
-        "shipping": { 
-            "mode": item_data.get('mode_shipping'), 
-            "local_pick_up": item_data.get('local_pick_up'),
-            "free_shipping": item_data.get('free_shipping')
-        },
-        "sale_terms": [
-            {"id": "WARRANTY_TYPE", "value_name": item_data.get('warranty_type')}, 
-            {"id": "WARRANTY_TIME", "value_name": item_data.get('warranty_time')},
-        ]
+        "shipping": {},
+        "sale_terms": []
     }
 
     if len(item_data['product_code']) not in [8,12,13,14]:
@@ -226,72 +161,38 @@ def _aux_product_format(item_data, public_images):
     else:
         product_code = {"id": "GTIN", "value_name": item_data['product_code']}
         item_format['attributes'].append(product_code)
-    
-    volume_cap = item_data.get('volume_capacity')
-    if volume_cap:
-        volume_cap_data = {
-            "id": "VOLUME_CAPACITY", 
-            "value_name": str(volume_cap) + ' mL'
-        }
-        item_format['attributes'].append(volume_cap_data)
-    
-    new_attr = [
-        'ink_color',
-        'pot_type',
-        'product_type',
-        'output_connector',
-        'surveillance_camera_type',
-        'camera_locations',
-        'cable_and_adapter_type',
-        'data_storage_capacity',
-        'usb_port_version',
-        'capacity',
-        'power_supply_type',
-        'grading',
-        'with_usb',
-        'size',
-        'color',
-        'gender',
-        'name',
-        'iron_type',
-        'input_connector',
-        'thermal_container_type',
-        'is_factory_kit',
-        'pieces_number',
-        'material',
-        'drinking_glass_product_type',
-        'makeup_format',
-        'eyeliner_type',
-        'backpack_type',
-        'faucet_control_type',
-        'makeup_brushes_number',
-        'finish',
-        'lip_liner_type',
-        'board_game_name',
-        'part_number',
-        'vehicle_type',
-        'voleyball_ground_type',
-        'scale',
-        'includes_assembly_manual',
-        'with_sound',
-        'roller_skates_size',
-        'roller_skates_type',
-        'with_brakes',
-        'age_group'
 
-    ]
+    for setting_dict in settings:
+        for setting in setting_dict:
+            if setting == 'attributes':
+                for v in setting_dict[setting]:
+                    if v["id"] == "VALUE_ADDED_TAX":
+                        item_format["attributes"].append({
+                            "id": "VALUE_ADDED_TAX",
+                            "value_id": value_added_tax_ids.get(v["user_input_value"]),
+                            "value_name": v["user_input_value"],
+                        })
+                    elif v["id"] == "IMPORT_DUTY":
+                        item_format["attributes"].append({
+                            "id": "IMPORT_DUTY",
+                            "value_id": import_duty_ids.get(v["user_input_value"]),
+                            "value_name": v["user_input_value"],
+                        })
+                    else:
+                        item_format["attributes"].append({
+                            "id": v["id"],
+                            "value_name": v["user_input_value"],
+                        })
 
-    for i in new_attr:
-        value = item_data.get(i) 
-        if value:
-            id = i.upper()
-            new_attribute = {
-                "id": id,
-                "value_name": value
-            }
-            item_format['attributes'].append(new_attribute)
+            if setting == 'sale_terms':
+                [item_format['sale_terms'].append({"id": v['id'], "value_name": v['user_input_value']}) for v in setting_dict[setting]]
 
-
+            elif setting == 'shipping':
+                [item_format["shipping"].update({v["id"]: v["user_input_value"]}) for v in setting_dict[setting]]
+            
+            elif setting == 'listing':
+                item_format['listing_type_id'] = [v.get('user_input_value') for v in setting_dict[setting]][0]
+    logger.info(item_format)
     return item_format
 
 
@@ -300,15 +201,10 @@ def _generate_category_options(item_id, product_name, token):
         If Categoty already exists then returns None.
     """
     response = requests.get("https://api.mercadolibre.com/sites/MLA/domain_discovery/search", 
-        params={
-            "q": product_name, 
-            "limit": 6}, 
-        headers={
-            "Authorization": f"Bearer {token}"}
+        params={"q": product_name, "limit": 6}, 
+        headers={"Authorization": f"Bearer {token}"}
     )
-
     if response.status_code == 200:
-
         logger.info(f"Category Options Generated")
         data = {
             'item_id': {
@@ -330,208 +226,128 @@ def _generate_category_options(item_id, product_name, token):
         return None
 
 
-def _get_attributes(item_id, category_id, token):
+def _settings_builder(item_id, category_id, price, token):
     """Return all required attributes giving the category"""
-    internal_requirements = [
-        'volume_capacity_required',
-        'units_per_pack_required',
-        'value_added_tax_required',
-        'import_duty_required',
-        'empty_gtin_reason_required',
-        'ink_color_required',
-        'pot_type_required',
-        'product_type_required',
-        'output_connector_required',
-        'input_connector_required',
-        'surveillance_camera_type_required',
-        'camera_locations_required',
-        'cable_and_adapter_type_required',
-        'data_storage_capacity_required',
-        'usb_port_version_required',
-        'capacity_required',
-        'power_supply_type_required',
-        'with_usb_required',
-        'grading_required',
-        'size_required',
-        'color_required',
-        'gender_required',
-        'name_required',
-        'iron_type_required',
-        'thermal_container_type_required',
-        'is_factory_kit_required',
-        'pieces_number_required',
-        'material_required',
-        'drinking_glass_product_type_required',
-        'makeup_format_required',
-        'eyeliner_type_required',
-        'backpack_type_required',
-        'faucet_control_type_required',
-        'makeup_brushes_number_required',
-        'finish_required',
-        'lip_liner_type_required',
-        'board_game_name_required',
-        'part_number_required',
-        'vehicle_type_required',
-        'voleyball_ground_type_required',
-        'scale_required',
-        'includes_assembly_manual_required',
-        'with_sound_required',
-        'roller_skates_size_required',
-        'roller_skates_type_required',
-        'with_brakes_required',
-        'age_group_required'
 
-    ]
-    internal_avoided_req = [
-        'brand_required',
-        'model_required',
-        'gtin_required'
-    ]
-    logger.info("Reading attributes requirements.")
-    response = requests.get(f"https://api.mercadolibre.com/categories/{category_id}/attributes",
-        headers={
-            "Authorization": f"Bearer {token}"
-        }
-    )
-    if response.status_code == 200:
-        req_attributes = response.json()
-        data = {'item_id': {'value': item_id, 'type': 'char'}}
-        not_mapped_att = []
-        for i in req_attributes:
-            attribute_name = i.get('id').lower() + "_required"
-            tag_required = i.get('tags').get('required', i.get('tags').get('conditional_required', None))
-            if tag_required == True:
-                if attribute_name in (internal_requirements):
-                    logger.info(f"Attribute {attribute_name} is required.")
-                    data[attribute_name] = {'value': True, 'type': 'boolean'}
-                elif attribute_name not in internal_avoided_req: 
-                    logger.info(f"New Attribute {attribute_name} not mapped.")
-                    not_mapped_att += [i]
-            else: 
-                continue
-        if len(data.keys()) > 1:
-            data['not_mapped_attributes'] = {
-                'value': unidecode(
-                    json.dumps(
-                        not_mapped_att, 
-                        ensure_ascii=False
-                        )
-                        .replace("'","")
-                        .replace("\\n","")
-                ), 'type': 'json'
-            }
-            data['updated_at'] = {
-                'value': datetime.now(), 
-                'type': 'datetime'}
-            update_method(data, schema_mercadolibre, table)      
-
-def _get_allowed_values(item_id, category_id, price, token):
-    """Get allowed values for Sale Terms, Shipping and Listing Prices"""
     headers = {"Authorization": f"Bearer {token}"}
+    url_categories = f"https://api.mercadolibre.com/categories/{category_id}"
+    internal_avoided_req = ['BRAND', 'MODEL', 'GTIN', 'EMPTY_GTIN_REASON']
+    data = {'item_id': {'value': item_id, 'type': 'char'}}
+    settings_list = [{'attributes':[]}, {'shipping':[]}, {'sale_terms':[]}, {'listing':[]}]
     
-    url_terms = f"https://api.mercadolibre.com/categories/{category_id}/sale_terms"
-    res_terms = requests.get(url_terms, headers=headers).json()
-    warranty_data = {}
-    for term in res_terms:
-        if term['id'] in ['WARRANTY_TYPE', 'WARRANTY_TIME']:
-            val = [v.get('name') for v in term.get('values', [])] if term.get('value_type') == 'list' else f"Entrada libre ({term.get('value_type')})"
-            warranty_data[term['id']] = val
+    def _user_default_values(setting):
+        """Default values for Mercadolibre"""
+        if setting == 'WARRANTY_TIME': return '30 dias'
+        elif setting == 'WARRANTY_TYPE': return 'Garantia del vendedor'
+        elif setting == 'VALUE_ADDED_TAX': return '21 %'
+        elif setting == 'IMPORT_DUTY': return '0 %'
+        elif setting == 'UNITS_PER_PACK': return '1'
+        elif setting == 'VOLUME_CAPACITY': return '1 mL'
+        elif setting == 'MODE': return 'me2'
+        elif setting == 'LOCAL_PICK_UP': return 'True'
+        elif setting == 'FREE_SHIPPING': return 'False'
+        elif setting == 'LISTING_TYPE': return 'gold_special'
+        elif setting == 'LOGISTIC_TYPE': return 'drop_off'
+        else: return ''
 
-    url_ship = f"https://api.mercadolibre.com/categories/{category_id}/shipping_preferences"
-    res_ship = requests.get(url_ship, headers=headers).json()
-    shipping_data = {
-        "modos": [log.get('mode') for log in res_ship.get('logistics', [])],
-        "metodos": [m.get('name') for m in res_ship.get('methods', [])]
+    for idx ,setting_dict in enumerate(settings_list):
+        for setting in setting_dict:
+            logger.info(f"Building {setting}..")
+
+            if setting == 'attributes':
+                response = requests.get(f"{url_categories}/{setting}", headers=headers).json()
+
+            elif setting == 'sale_terms':
+                response = requests.get(f"{url_categories}/{setting}", headers=headers).json()
+
+            elif setting == 'shipping':
+                url = f"https://api.mercadolibre.com/categories/{category_id}/shipping_preferences"
+                response = requests.get(url, headers=headers).json()
+                var1 = {
+                    'id': 'MODE', 
+                    'name': 'Metodo de Envio',
+                    'values':[{'name':[log.get('mode') for log in response.get('logistics')]}],
+                    'value_type': 'list',
+                    'value_max_lenght': '255'
+                }
+                var2 = {
+                    'id': 'LOCAL_PICK_UP', 
+                    'name': 'Buscar en Local',
+                    'values':[{'name':['True','False']}],
+                    'value_type': 'list',
+                    'value_max_lenght': '5'
+                }
+                var3 = {
+                    'id': 'FREE_SHIPPING', 
+                    'name': 'Envio Gratis',
+                    'values':[{'name':['True','False']}],
+                    'value_type': 'list',
+                    'value_max_lenght': '5'
+                }
+                var4 = {
+                    'id': 'LOGISTIC_TYPE', 
+                    'name': 'Tipo de Logistica',
+                    'values':[{'name':['fulfillment','cross_docking','self_service','drop_off','custom']}],
+                    'value_type': 'list',
+                    'value_max_lenght': '20'
+                }
+                response = [var1, var2, var3, var4]
+
+            elif setting == 'listing':
+                response = requests.get(f"https://api.mercadolibre.com/sites/MLA/listing_prices?price={price}&category_id={category_id}", headers=headers).json()
+                listing_data = [{
+                    "id": data.get('listing_type_id'),
+                    "name": data.get('listing_type_name'),
+                    "sale_fee_amount": data.get('sale_fee_amount'),
+                    "sale_fee_details": data.get('sale_fee_details'),
+                    "listing_fee_amount": data.get('listing_fee_amount'),
+                    "listing_fee_details": data.get('listing_fee_details'),
+                } for data in response]
+                response = [{
+                    'id': 'LISTING_TYPE', 
+                    'name': 'Campaña de Cuotas',
+                    'values':[{'name':listing_data}],
+                    'value_type': 'list',
+                    'value_max_lenght': '255'
+                }]
+                
+            for i in response:
+                
+                id = i.get('id')
+                if setting == 'attributes':
+                    bool_att_req = i.get('tags').get('required', i.get('tags').get('conditional_required'))
+
+                if (bool_att_req == True and id not in internal_avoided_req) or (
+                    setting == 'sale_terms' and id in ['WARRANTY_TYPE', 'WARRANTY_TIME']) or (
+                    setting == 'listing' or setting == 'shipping'
+                    ): 
+                    values = {
+                        'id': id,
+                        'name': i.get('name'),
+                        'value_examples': [val.get('name') for val in i.get('values')] if i.get('values') else '',
+                        'value_max_lenght': i.get('value_max_length') if i.get('value_max_length') else '',
+                        'value_type': i.get('value_type'),
+                        'condition': 'Restricted Input' if i.get('value_type').lower() == 'list' else 'Free Input',
+                        'user_input_value': _user_default_values(id)
+                    }
+                    settings_list[idx][setting] += [values]
+                    logger.info(f"{setting}: {id} added to json.")
+
+    data['settings'] = {
+        'value': unidecode(
+            json.dumps(
+                settings_list, 
+                ensure_ascii=False
+                )
+                .replace("'","")
+                .replace("\\n","")
+        ), 'type': 'json'
     }
-
-    url_prices = f"https://api.mercadolibre.com/sites/MLA/listing_prices?price={price}&category_id={category_id}"
-    res_prices = requests.get(url_prices, headers=headers).json()
-    prices_data = [
-        {
-            "id": p.get('listing_type_id'),
-            "nombre": p.get('listing_type_name'),
-            "comision_fija": p.get('sale_fee_amount'),
-            "porcentaje_comision": f"{p.get('listing_fee_details', {}).get('percentage')}%"
-        } 
-        for p in res_prices
-    ]
-
-    url_attributes = f"https://api.mercadolibre.com/categories/{category_id}/attributes"
-    res_attributes = requests.get(url_attributes, headers=headers).json()
-
-    required_attributes_data = {}
-
-    excluded_required_attributes = {
-        "GTIN",
-        "BRAND",
-        "IMPORT_DUTY",
-        "VALUE_ADDED_TAX",
-        "EMPTY_GTIN_REASON"
-    }
-
-    for attr in res_attributes:
-        tags = attr.get("tags", {})
-
-        is_required = (
-            tags.get("required") is True
-            or tags.get("catalog_required") is True
-            or tags.get("conditional_required") is True
-            or tags.get("required_if") is True
-        )
-
-        if not is_required:
-            continue
-
-        attr_id = attr.get("id")
-
-        # NUEVO: excluir atributos que no querés sumar
-        if attr_id in excluded_required_attributes:
-            continue
-
-        # Evita duplicar con lo previo: warranty ya viene desde sale_terms
-        if attr_id in warranty_data:
-            continue
-
-        if attr.get("value_type") == "list":
-            values = [
-                v.get("name")
-                for v in attr.get("values", [])
-                if v.get("name") is not None
-            ]
-        else:
-            values = f"Entrada libre ({attr.get('value_type')})"
-
-        required_attributes_data[attr_id] = {
-            "name": attr.get("name"),
-            "value_type": attr.get("value_type"),
-            "values": values
-        }
-
-    category_metadata = {
-        "category_id": category_id,
-        "settings": {
-            "warranty": warranty_data,
-            "shipping": shipping_data,
-            "listing_options": prices_data,
-            "required_attributes": required_attributes_data
-        }
-    }
-
-    data = {
-        'item_id': {
-            'value': item_id, 
-            'type': 'char'
-            }
-        }
-
-    data['allowed_options'] = {
-        'value': json.dumps(category_metadata, ensure_ascii=False), 
-        'type': 'json'}
 
     data['updated_at'] = {
         'value': datetime.now(), 
         'type': 'datetime'}
-
+    
     update_method(data, schema_mercadolibre, table)
 
 
@@ -547,9 +363,8 @@ def prepublish_product(item_data:dict, token:str):
         return
 
     category_id = item_data.get('category_id')
-    if category_id is not None:
-        _get_attributes(item_id, category_id, token)
-        _get_allowed_values(item_id, category_id, price, token)
+    if category_id is not None and item_data.get('settings') is None:
+        _settings_builder(item_id, category_id, price, token)
     else:
         table = 'attributes'
         msg = json.dumps([{'Error': 'Es necesario seleccionar una categoria.'}])
@@ -813,16 +628,29 @@ def _set_description(meli_id, description, token, update=False):
 
 def calculate_cost(item_data:dict, user_id:str, token:str):
     """Calculate the cost for selling in mercadolibre."""
+
+    all_settings_groups = json.loads(item_data.get("settings"))
+    for settings_group in all_settings_groups:
+        for section_name in settings_group:
+            if section_name == "shipping":
+                for variable in settings_group[section_name]:
+                    if variable.get('id') == 'FREE_SHIPPING':
+                        free_shipping = variable.get('user_input_value')
+                    if variable.get('id') == 'MODE':
+                        shipping_mode = variable.get('user_input_value')
+                    if variable.get('id') == 'LOGISTIC_TYPE':
+                        logistic_type = variable.get('user_input_value')
+
+            elif section_name == "listing":
+                for variable in settings_group[section_name]:
+                    if variable.get('id') == 'LISTING_TYPE':
+                        listing_type = variable.get('user_input_value')
     
     item_id = item_data.get('id')
     condition_type = item_data.get('condition_type')
     category_id = item_data.get('category_id')
     currency = item_data.get('currency_id')
     dimentions = item_data.get('dimentions')
-    shipping_mode = item_data.get('mode_shipping')
-    listing_type = item_data.get('listing_type_id')
-    free_shipping = item_data.get('free_shipping')
-    logistic_type = item_data.get('logistic_type')
     billable_weight = 5828
     price = item_data.get("price_mercadolibre") if item_data.get("price_mercadolibre") else item_data.get("price")
     
@@ -844,14 +672,14 @@ def calculate_cost(item_data:dict, user_id:str, token:str):
     response = response.json()
     cost_detail = {
         'item_id':{'value': item_id, 'type':'char'},
-        'sale_fee_amount':{'value': response['sale_fee_amount'], 'type':'signed'}, 
-        'fixed_fee':{'value':  response['sale_fee_details']['fixed_fee'], 'type':'signed'}, 
-        'financing_add_on_fee':{'value':  response['sale_fee_details']['financing_add_on_fee'], 'type':'signed'}, 
-        'meli_percentage_fee':{'value':  response['sale_fee_details']['meli_percentage_fee'], 'type':'signed'},
-        'percentage_fee':{'value':  response['sale_fee_details']['percentage_fee'], 'type':'signed'},
-        'gross_amount':{'value':  response['sale_fee_details']['gross_amount'], 'type':'signed'},
-        'listing_fixed_fee':{'value': response['listing_fee_details']['fixed_fee'], 'type':'signed'}, 
-        'listing_gross_amount':{'value': response['listing_fee_details']['gross_amount'], 'type':'signed'}, 
+        'sale_fee_amount':{'value': response['sale_fee_amount'], 'type':'float'}, 
+        'fixed_fee':{'value':  response['sale_fee_details']['fixed_fee'], 'type':'float'}, 
+        'financing_add_on_fee':{'value':  response['sale_fee_details']['financing_add_on_fee'], 'type':'float'}, 
+        'meli_percentage_fee':{'value':  response['sale_fee_details']['meli_percentage_fee'], 'type':'float'},
+        'percentage_fee':{'value':  response['sale_fee_details']['percentage_fee'], 'type':'float'},
+        'gross_amount':{'value':  response['sale_fee_details']['gross_amount'], 'type':'float'},
+        'listing_fixed_fee':{'value': response['listing_fee_details']['fixed_fee'], 'type':'float'}, 
+        'listing_gross_amount':{'value': response['listing_fee_details']['gross_amount'], 'type':'float'}, 
     }
 
     logger.info("Step 2. Calculating Shipping Cost")
@@ -867,11 +695,11 @@ def calculate_cost(item_data:dict, user_id:str, token:str):
         logger.error(user_message)
         return
     response = response.json()
-    cost_detail['ship_cost_amount'] = {'value': response['coverage']['all_country']['list_cost'], 'type': 'signed'}
-    cost_detail['ship_discount'] = {'value': response['coverage']['all_country']['discount']['rate'], 'type': 'signed'}
-    cost_detail['ship_cost_full_amount'] = {'value': response['coverage']['all_country']['discount']['promoted_amount'], 'type': 'signed'}
+    cost_detail['ship_cost_amount'] = {'value': response['coverage']['all_country']['list_cost'], 'type': 'float'}
+    cost_detail['ship_discount'] = {'value': response['coverage']['all_country']['discount']['rate'], 'type': 'float'}
+    cost_detail['ship_cost_full_amount'] = {'value': response['coverage']['all_country']['discount']['promoted_amount'], 'type': 'float'}
     total_selling_cost = cost_detail.get('ship_cost_amount').get('value') + cost_detail.get('sale_fee_amount').get('value')
-    cost_detail['total_selling_cost'] = {'value': total_selling_cost, 'type': 'signed'}
+    cost_detail['total_selling_cost'] = {'value': total_selling_cost, 'type': 'float'}
     
     table = 'selling_calculation'
     upsert_method(cost_detail, schema_mercadolibre, table )

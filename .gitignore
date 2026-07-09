@@ -1,5 +1,5 @@
 .env
-venv-ecommerce-manager/
+venv-srvice-inventory-ecommerce/
 service_account.json
 test.ipynb
 __pycache__/
