@@ -6,7 +6,7 @@ from app.settings.config import (
     USER_DB, 
     PASSWORD_DB, 
     NAME_DB, 
-    SCHEMA_APP_PRODUCT_SYNC
+    SCHEMA_INVENTORY
     )
 
 def getconn():
@@ -67,58 +67,6 @@ def get_tienda_nube_id(id):
         return data
 
 
-def get_tienda_nube_item_data(item_id):
-    """"""
-    with engine.begin() as conn:
-        logger.info(f"Extracting data from item: {item_id}.")
-        result = conn.execute(
-            text(f"""
-                SELECT 
-                 a.*,
-                 b.*,
-                 c.product_id,
-                 c.variant_id,
-                 d.category_id 
-                 
-                FROM {SCHEMA_APP_PRODUCT_SYNC}.product_catalog_sync as a
-                LEFT JOIN (
-                SELECT 
-                    id as attribute_id,
-                    item_id,
-                    seo_title,
-                    seo_description,
-                    barcode,
-                    video_url,
-                    tags,
-                    promotional_price,
-                    mpn,
-                    age_group,
-                    gender
-                FROM tienda_nube.attributes) as b ON a.id = b.item_id 
-                
-                LEFT JOIN (
-                SELECT
-                    attribute_id,
-                    product_id,
-                    variant_id
-                FROM 
-                    tienda_nube.product_status) as c ON b.attribute_id = c.attribute_id
-                 
-                LEFT JOIN 
-                 (select id as category_id, name as category_name from tienda_nube.categories) as d
-                 ON d.category_name = a.product_type_path
-                
-                WHERE a.id = {item_id};
-            """)
-        )
-        #REVISAR PORQUE ADOPTE ESTE DISEÑO (BATCH)
-        data = [dict(row) for row in result.mappings()]
-        if len(data) > 1:
-            return data
-        else:
-            return data[0]
-            
-
 def load_tienda_nube_product_status(data):
     """writting field description or title using ai reply,
     this is part from the pre-publish event."""
@@ -166,7 +114,7 @@ def get_method(data):
 
         q_columns = ', '.join(data.get('q_columns'))
         q_from = data.get('q_from')
-        q_join = data.get('q_join', None)
+        q_join =  ' '.join(data.get('q_join', None))
         q_where  = data.get('q_where', None)
         q_limit  = data.get('q_limit', None)
 
@@ -195,7 +143,7 @@ def get_item_data(item_id):
         logger.info(f"Extracting data from item: {item_id}.")
         result = conn.execute(
             text(f"""
-                SELECT * FROM {SCHEMA_APP_PRODUCT_SYNC}.product_catalog_sync
+                SELECT * FROM {SCHEMA_INVENTORY}.product_catalog_sync
                 WHERE id = {item_id};
             """)
         )
@@ -389,7 +337,7 @@ def get_bitcram_data(meli_id):
                       a.id,
                       a.cost,
                       1 as aux_priority 
-                      from {SCHEMA_APP_PRODUCT_SYNC}.product_catalog_sync as a
+                      from {SCHEMA_INVENTORY}.product_catalog_sync as a
                       where a.meli_id = '{meli_id}'
                       limit 1
                       ),
@@ -402,7 +350,7 @@ def get_bitcram_data(meli_id):
                       b.cost,
                       2 as aux_priority 
                       from mercadolibre.catalog_listing as a
-                      left join {SCHEMA_APP_PRODUCT_SYNC}.product_catalog_sync as b on a.meli_id = b.meli_id
+                      left join {SCHEMA_INVENTORY}.product_catalog_sync as b on a.meli_id = b.meli_id
                       where a.catalog_product_id in (
                         select catalog_product_id 
                         from mercadolibre.catalog_listing 

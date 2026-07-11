@@ -6,50 +6,34 @@ from app.utils.logger import logger
 from app.service.llm_api import call_deepseek_api
 from app.service.notifications import enviar_mensaje_whapi
 from app.service.database import update_method, get_method, upsert_method
-from app.settings.config import TOKEN_WHAPI, PHONE_INTERNAL
+from app.settings.config import TOKEN_WHAPI, PHONE_INTERNAL, SCHEMA_INVENTORY, SCHEMA_MERCADOLIBRE
 
-#schema_inventory = 'app_import'
-#schema_mercadolibre = 'mercadolibre'
-
-schema_inventory = 'guias_locales_testing'
-schema_mercadolibre = 'guias_locales_testing'
-
-table = 'attributes'
+ATTRIBUTES_TABLE = 'attributes'
+PRODUCTS_TABLE = 'product_catalog_sync'
+COSTS_TABLE = 'selling_calculation'
 
 def ai_error_handling(api_response, user_message, item_id):
-    table = 'product_catalog_sync'
-    sys_prompt = """Tu tarea es procesar una respuesta json
-    de un error retornado por la API de MercadoLibre, y devolver, en español un 
-    formato mas limpio y corto para que el usuario no-tech pueda entenderlo mejor.
-    Rule: La respuesta debe de estar en formato de bulletpoints.
-    Rule: Usa menos de 255 caracteres.
-    Rule: Elimina cualquier tipo de comilla simple u doble.
+    logger.info("Improving Error message with AI and updating DB for Customer Visibility.")
+    sys_prompt = """
+    Your task is to process a JSON error response returned by the Mercado Libre API and 
+    produce a cleaner, shorter explanation in Spanish that a non-technical user can easily understand.
+    Rules:
+    - The response must be formatted as bullet points.
+    - Use fewer than 255 characters.
+    - Remove any single or double quotation marks.
     """
-    logger.info("Improving Error message with AI and sending.")
     user_prompt = api_response.json()
     error_clean = call_deepseek_api(sys_prompt, user_prompt)
     message = f"{user_message}:\n {error_clean}"
     data = {
-    'id': {
-        'value': item_id, 
-        'type': 'char'
-        },
-    'status': {
-        'value': 'Error.', 
-        'type': 'char'
-        },
-    'reason': {
-        'value': error_clean, 
-        'type': 'char'
-        },
-    'remedy': {
-        'value': None, 
-        'type': 'null'
-        },
+    'id': {'value': item_id, 'type': 'char'},
+    'status': {'value': 'Error.', 'type': 'char'},
+    'reason': {'value': error_clean, 'type': 'char'},
+    'remedy': {'value': None, 'type': 'null'},
     }
     logger.error(message)
     enviar_mensaje_whapi(TOKEN_WHAPI, PHONE_INTERNAL, message)
-    update_method(data, schema_inventory ,table)
+    update_method(data, SCHEMA_INVENTORY, PRODUCTS_TABLE)
 
 
 def get_data_for_meli(item_id):
@@ -78,8 +62,8 @@ def get_data_for_meli(item_id):
             'b.condition_type',
             'b.settings'
         ],
-        'q_from':f'FROM {schema_inventory}.product_catalog_sync as a',
-        'q_join':f'LEFT JOIN {schema_mercadolibre}.attributes as b on b.item_id = a.id',
+        'q_from':f'FROM {SCHEMA_INVENTORY}.{PRODUCTS_TABLE} as a',
+        'q_join':f'LEFT JOIN {SCHEMA_MERCADOLIBRE}.{ATTRIBUTES_TABLE} as b on b.item_id = a.id',
         'q_where': f'WHERE a.id = {item_id}',
         'q_limit':'LIMIT 1'
     }
@@ -89,16 +73,11 @@ def get_data_for_meli(item_id):
 
 def _aux_product_format(item_data, public_images):
     """"""
-    logger.info("Creating Product Format.")
-    if item_data["product_name_meli"]: 
-        product_name = item_data["product_name_meli"]
-    else:
-        product_name = item_data["product_name"]
+    logger.info("Creating Product Schema for Mercadolibre.")
 
-    if item_data.get("price_mercadolibre"):
-        price = item_data.get("price_mercadolibre")
-    else:
-        price = item_data.get("price")
+    product_name = item_data["product_name_meli"] or item_data["product_name"]
+    price = item_data["price_mercadolibre"] or item_data["price"]
+    settings = json.loads(item_data['settings'])
 
     value_added_tax_ids = {
         "0 %": "48405907",
@@ -126,20 +105,18 @@ def _aux_product_format(item_data, public_images):
         "70 %": "49553255"
     }
     
-    settings = json.loads(item_data.get('settings'))
-
     item_format = {
         "title": product_name,
-        "category_id": item_data.get('category_id'), 
+        "category_id": item_data['category_id'], 
         "price": str(price), 
         "currency_id": 'ARS', 
-        "available_quantity": item_data.get('stock'),
-        "buying_mode": item_data.get('buying_mode'), 
-        "condition": item_data.get('condition_type'),
+        "available_quantity": item_data['stock'],
+        "buying_mode": item_data['buying_mode'], 
+        "condition": item_data['condition_type'],
         "pictures": public_images, 
         "attributes": [
-            {"id": "BRAND", "value_name": item_data.get('brand')},
-            {"id": "MODEL", "value_name": item_data.get('model')},
+            {"id": "BRAND", "value_name": item_data['brand']},
+            {"id": "MODEL", "value_name": item_data['model']},
         ],
         "shipping": {},
         "sale_terms": []
@@ -192,7 +169,6 @@ def _aux_product_format(item_data, public_images):
             
             elif setting == 'listing':
                 item_format['listing_type_id'] = [v.get('user_input_value') for v in setting_dict[setting]][0]
-    logger.info(item_format)
     return item_format
 
 
@@ -200,69 +176,58 @@ def _generate_category_options(item_id, product_name, token):
     """ Generate category ID trough Mercadolibre API.
         If Categoty already exists then returns None.
     """
+    logger.info("Generating Category Options")
     response = requests.get("https://api.mercadolibre.com/sites/MLA/domain_discovery/search", 
         params={"q": product_name, "limit": 6}, 
         headers={"Authorization": f"Bearer {token}"}
     )
     if response.status_code == 200:
-        logger.info(f"Category Options Generated")
         data = {
-            'item_id': {
-                'value': item_id, 
-                'type': 'char'
-            },
-            'category_options': {
-                'value': json.dumps(response.json()), 
-                'type': 'json'
-            },
-            'updated_at': {
-                'value': datetime.now(), 
-                'type': 'datetime'
-            }
+            'item_id': {'value': item_id, 'type': 'char'},
+            'category_options': {'value': json.dumps(response.json()), 'type': 'json'},
+            'updated_at': {'value': datetime.now(), 'type': 'datetime'}
         }
-        update_method(data, schema_mercadolibre, table)  
+        update_method(data, SCHEMA_MERCADOLIBRE, ATTRIBUTES_TABLE)  
     else:
         logger.error(f"Failed to create Category Options {response.text}")
-        return None
+        return
 
 
 def _settings_builder(item_id, category_id, price, token):
     """Return all required attributes giving the category"""
 
-    headers = {"Authorization": f"Bearer {token}"}
-    url_categories = f"https://api.mercadolibre.com/categories/{category_id}"
-    internal_avoided_req = ['BRAND', 'MODEL', 'GTIN', 'EMPTY_GTIN_REASON']
-    data = {'item_id': {'value': item_id, 'type': 'char'}}
+    logger.info("Running Settings Builder")
+    HEADER = {"Authorization": f"Bearer {token}"}    
+    INTERNAL_AVOID_REQMNT = ['BRAND', 'MODEL', 'GTIN', 'EMPTY_GTIN_REASON']
+
+    default_settings = {
+        "WARRANTY_TIME": "30 dias",
+        "WARRANTY_TYPE": "Garantia del vendedor",
+        "VALUE_ADDED_TAX": "21 %",
+        "IMPORT_DUTY": "0 %",
+        "UNITS_PER_PACK": "1",
+        "VOLUME_CAPACITY": "1 mL",
+        "MODE": "me2",
+        "LOCAL_PICK_UP": "True",
+        "FREE_SHIPPING": "False",
+        "LISTING_TYPE": "gold_special",
+        "LOGISTIC_TYPE": "drop_off",
+    }
+
     settings_list = [{'attributes':[]}, {'shipping':[]}, {'sale_terms':[]}, {'listing':[]}]
     
-    def _user_default_values(setting):
-        """Default values for Mercadolibre"""
-        if setting == 'WARRANTY_TIME': return '30 dias'
-        elif setting == 'WARRANTY_TYPE': return 'Garantia del vendedor'
-        elif setting == 'VALUE_ADDED_TAX': return '21 %'
-        elif setting == 'IMPORT_DUTY': return '0 %'
-        elif setting == 'UNITS_PER_PACK': return '1'
-        elif setting == 'VOLUME_CAPACITY': return '1 mL'
-        elif setting == 'MODE': return 'me2'
-        elif setting == 'LOCAL_PICK_UP': return 'True'
-        elif setting == 'FREE_SHIPPING': return 'False'
-        elif setting == 'LISTING_TYPE': return 'gold_special'
-        elif setting == 'LOGISTIC_TYPE': return 'drop_off'
-        else: return ''
-
     for idx ,setting_dict in enumerate(settings_list):
         for setting in setting_dict:
             logger.info(f"Building {setting}..")
-
             if setting == 'attributes':
-                response = requests.get(f"{url_categories}/{setting}", headers=headers).json()
+                response = requests.get(f"https://api.mercadolibre.com/categories/{category_id}/{setting}", headers=HEADER).json()
 
             elif setting == 'sale_terms':
-                response = requests.get(f"{url_categories}/{setting}", headers=headers).json()
+                response = requests.get(f"https://api.mercadolibre.com/categories/{category_id}/{setting}", headers=HEADER).json()
 
             elif setting == 'shipping':
                 url = f"https://api.mercadolibre.com/categories/{category_id}/shipping_preferences"
-                response = requests.get(url, headers=headers).json()
+                response = requests.get(url, headers=HEADER).json()
                 var1 = {
                     'id': 'MODE', 
                     'name': 'Metodo de Envio',
@@ -294,7 +259,7 @@ def _settings_builder(item_id, category_id, price, token):
                 response = [var1, var2, var3, var4]
 
             elif setting == 'listing':
-                response = requests.get(f"https://api.mercadolibre.com/sites/MLA/listing_prices?price={price}&category_id={category_id}", headers=headers).json()
+                response = requests.get(f"https://api.mercadolibre.com/sites/MLA/listing_prices?price={price}&category_id={category_id}", headers=HEADER).json()
                 listing_data = [{
                     "id": data.get('listing_type_id'),
                     "name": data.get('listing_type_name'),
@@ -312,12 +277,11 @@ def _settings_builder(item_id, category_id, price, token):
                 }]
                 
             for i in response:
-                
                 id = i.get('id')
                 if setting == 'attributes':
                     bool_att_req = i.get('tags').get('required', i.get('tags').get('conditional_required'))
 
-                if (bool_att_req == True and id not in internal_avoided_req) or (
+                if (bool_att_req == True and id not in INTERNAL_AVOID_REQMNT) or (
                     setting == 'sale_terms' and id in ['WARRANTY_TYPE', 'WARRANTY_TIME']) or (
                     setting == 'listing' or setting == 'shipping'
                     ): 
@@ -325,60 +289,47 @@ def _settings_builder(item_id, category_id, price, token):
                         'id': id,
                         'name': i.get('name'),
                         'value_examples': [val.get('name') for val in i.get('values')] if i.get('values') else '',
-                        'value_max_lenght': i.get('value_max_length') if i.get('value_max_length') else '',
-                        'value_type': i.get('value_type'),
+                        'value_max_lenght': i.get('value_max_length', ''),
+                        'value_type': i.get('value_type', ''),
                         'condition': 'Restricted Input' if i.get('value_type').lower() == 'list' else 'Free Input',
-                        'user_input_value': _user_default_values(id)
+                        'user_input_value': default_settings.get(id, '')
                     }
                     settings_list[idx][setting] += [values]
                     logger.info(f"{setting}: {id} added to json.")
 
+    data = {'item_id': {'value': item_id, 'type': 'char'}}
     data['settings'] = {
-        'value': unidecode(
-            json.dumps(
-                settings_list, 
-                ensure_ascii=False
-                )
-                .replace("'","")
-                .replace("\\n","")
+        'value': unidecode(json.dumps(settings_list, ensure_ascii=False).replace("'","").replace("\\n","")
         ), 'type': 'json'
     }
-
-    data['updated_at'] = {
-        'value': datetime.now(), 
-        'type': 'datetime'}
-    
-    update_method(data, schema_mercadolibre, table)
+    data['updated_at'] = {'value': datetime.now(), 'type': 'datetime'}
+    update_method(data, SCHEMA_MERCADOLIBRE, ATTRIBUTES_TABLE)
 
 
 def prepublish_product(item_data:dict, token:str):
     """"""
-    logger.info("Runing Prepublish Examination")
-    item_id = item_data.get('id')
-    product_name =  item_data.get("product_name_meli") if item_data.get("product_name_meli") else item_data.get("product_name")
-    price =  item_data.get("price_mercadolibre") if item_data.get("price_mercadolibre") else item_data.get("price")
-    category_options = item_data.get('category_options')
+    logger.info("Running Pre-Publish Action on Mercadolibre")
+
+    item_id = item_data['id']
+    product_name = item_data["product_name_meli"] or item_data["product_name"]
+    price = item_data["price_mercadolibre"] or item_data["price"]
+    category_options = item_data['category_options']
     if category_options is None:
         _generate_category_options(item_id, product_name, token)
         return
 
-    category_id = item_data.get('category_id')
-    if category_id is not None and item_data.get('settings') is None:
+    category_id = item_data['category_id']
+    if category_id is not None:
         _settings_builder(item_id, category_id, price, token)
+        return
     else:
-        table = 'attributes'
-        msg = json.dumps([{'Error': 'Es necesario seleccionar una categoria.'}])
         data = {
         'item_id': {
             'value': item_id, 
             'type': 'char'
             },
-        'not_mapped_attributes': {
-            'value': msg, 
-            'type': 'json'
-            },
-        'allowed_options': {
-            'value': msg, 
+        'settings': {
+            'value': json.dumps([{'Error': 'Es necesario seleccionar una categoria.'}]), 
             'type': 'json'
             },
         'updated_at': {
@@ -386,14 +337,15 @@ def prepublish_product(item_data:dict, token:str):
                 'type': 'datetime'
             }
         }
-        update_method(data, schema_mercadolibre, table)
+        update_method(data, SCHEMA_MERCADOLIBRE, ATTRIBUTES_TABLE)
 
 
 def publish_item(item_data, public_images, token):
     """publish the item with a second try option"""
-    table = 'product_catalog_sync'
 
-    item_id = item_data.get('id')
+    logger.info("Running Publish Action on Mercadolibre")
+
+    item_id = item_data['id']
     logger.info("Step 1: Checking if product is already publish.")
     if item_data['meli_id']:
         logger.warning(f"""Item: {item_id} already exists in mercadolibre 
@@ -437,7 +389,7 @@ def publish_item(item_data, public_images, token):
             'type': 'char'
             },
         }
-        update_method(data, schema_inventory, table)
+        update_method(data, SCHEMA_INVENTORY, PRODUCTS_TABLE)
         return
     
     else:
@@ -450,10 +402,10 @@ def publish_item(item_data, public_images, token):
 
 def update_item(item_id, item_data, public_images, token):
     """Update MercadoLibre item"""
-
-    logger.info("Updating product in mercadolibre")
-    meli_id = item_data.get('meli_id')
     
+    logger.info("Running Update Action on Mercadolibre")
+    
+    meli_id = item_data['meli_id']
     if meli_id is None or meli_id == '':
         logger.error(f"Item: {item_data['id']} is not published, nothing to update.")
         return
@@ -487,6 +439,7 @@ def update_item(item_id, item_data, public_images, token):
         del item_format['condition']
         del item_format['attributes']
         del item_format['buying_mode']
+
         listing_type_id = item_format.get('listing_type_id')
         del item_format['listing_type_id']
 
@@ -533,6 +486,8 @@ def update_item(item_id, item_data, public_images, token):
         
 def pause_item(item_data, token):
     """Changes item status to paused in Mercado Libre"""
+
+    logger.info("Running Pause Action on Mercadolibre")
     meli_id = item_data['meli_id'] 
 
     if meli_id is None:
@@ -559,9 +514,11 @@ def pause_item(item_data, token):
 
 def delete_item(item_data, token): 
     """"""
+
+    logger.info("Running Delete Action on Mercadolibre")
+
     meli_id = item_data['meli_id'] 
     item_id = item_data['id']
-    table = 'product_catalog_sync'
 
     if meli_id is None:
         logger.error(f"Product: {item_id} is not published, nothing to delete.")
@@ -575,32 +532,14 @@ def delete_item(item_data, token):
     requests.put(url=url, json=var_deleted, headers=headers)
 
     data = {
-        'id': {
-            'value': item_id, 
-            'type': 'char'
-            },
-        'status': {
-            'value': None, 
-            'type': 'null'
-            },
-        'reason': {
-            'value': None, 
-            'type': 'null'
-            },
-        'remedy': {
-            'value': None, 
-            'type': 'null'
-            },
-        'permalink': {
-            'value': None, 
-            'type': 'null'
-            },
-        'meli_id': {
-            'value': None, 
-            'type': 'null'
-            },
+        'id': {'value': item_id, 'type': 'char'},
+        'status': {'value': None, 'type': 'null'},
+        'reason': {'value': None, 'type': 'null'},
+        'remedy': {'value': None, 'type': 'null'},
+        'permalink': {'value': None, 'type': 'null'},
+        'meli_id': {'value': None, 'type': 'null'},
         }
-    update_method(data, schema_inventory, table)
+    update_method(data, SCHEMA_INVENTORY, PRODUCTS_TABLE)
 
     
 def _set_description(meli_id, description, token, update=False):
@@ -629,6 +568,9 @@ def _set_description(meli_id, description, token, update=False):
 def calculate_cost(item_data:dict, user_id:str, token:str):
     """Calculate the cost for selling in mercadolibre."""
 
+    logger.info("Running Cost Calculation Action")
+    header = {'Authorization': f'Bearer {token}'}
+
     all_settings_groups = json.loads(item_data.get("settings"))
     for settings_group in all_settings_groups:
         for section_name in settings_group:
@@ -655,20 +597,19 @@ def calculate_cost(item_data:dict, user_id:str, token:str):
     price = item_data.get("price_mercadolibre") if item_data.get("price_mercadolibre") else item_data.get("price")
     
 
-    header = {'Authorization': f'Bearer {token}'}
-
     logger.info("Step 1. Calculating Selling Cost (without shipping)")
     url = (
-    f"https://api.mercadolibre.com/sites/MLA/listing_prices?"
-    f"category_id={category_id}&price={price}&cy_id={currency}&"
-    f"logistic_type={logistic_type}&shipping_modes={shipping_mode}&"
-    f"listing_type_id={listing_type}&billable_weight={billable_weight}&"
+        f"https://api.mercadolibre.com/sites/MLA/listing_prices?"
+        f"category_id={category_id}&price={price}&cy_id={currency}&"
+        f"logistic_type={logistic_type}&shipping_modes={shipping_mode}&"
+        f"listing_type_id={listing_type}&billable_weight={billable_weight}&"
     )    
     response = requests.get(url=url,headers=header)
     if response.status_code > 300:
         user_message = f"Error while calculating cost for product: {item_id}: {response.json()}"
         logger.error(user_message)
         return
+    
     response = response.json()
     cost_detail = {
         'item_id':{'value': item_id, 'type':'char'},
@@ -688,12 +629,14 @@ def calculate_cost(item_data:dict, user_id:str, token:str):
         f"shipping_options/free?dimensions={dimentions}&"
         f"verbose=true&item_price={price}&category_id={category_id}&"
         f"listing_type_id={listing_type}&mode={shipping_mode}&"
-        f"condition={condition_type}&logistic_type={logistic_type}&free_shipping={free_shipping}")
+        f"condition={condition_type}&logistic_type={logistic_type}&free_shipping={free_shipping}"
+    )
     response = requests.get(url=url, headers=header)
     if response.status_code > 300:
         user_message = f"Error while calculating cost for product: {item_id}: {response.json()}"
         logger.error(user_message)
         return
+    
     response = response.json()
     cost_detail['ship_cost_amount'] = {'value': response['coverage']['all_country']['list_cost'], 'type': 'float'}
     cost_detail['ship_discount'] = {'value': response['coverage']['all_country']['discount']['rate'], 'type': 'float'}
@@ -701,5 +644,4 @@ def calculate_cost(item_data:dict, user_id:str, token:str):
     total_selling_cost = cost_detail.get('ship_cost_amount').get('value') + cost_detail.get('sale_fee_amount').get('value')
     cost_detail['total_selling_cost'] = {'value': total_selling_cost, 'type': 'float'}
     
-    table = 'selling_calculation'
-    upsert_method(cost_detail, schema_mercadolibre, table )
+    upsert_method(cost_detail, SCHEMA_MERCADOLIBRE, COSTS_TABLE )

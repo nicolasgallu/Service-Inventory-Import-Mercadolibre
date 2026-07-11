@@ -1,5 +1,5 @@
 from app.service.database import ( 
-    get_tienda_nube_item_data,
+    get_method,
     load_tienda_nube_product_status,
     delete_tienda_nube_product_status,
     db_tiendanube_category)
@@ -10,6 +10,79 @@ import json
 from datetime import datetime
 from app.utils.logger import logger
 
+SCHEMA_INVENTORY='guias_locales_testing'
+SCHEMA_MELI='guias_locales_testing'
+SCHEMA_TNUBE='guias_locales_tiendanube'
+
+PRODUCTS_TABLE='product_catalog_sync'
+ATTRIBUTES_TABLE='attributes'
+PRODUCT_STATUS_TABLE='product_status'
+CATEGORIES_TABLE='categories'
+
+def get_data_for_tnube(item_id):
+    """"""
+    query = {
+        'q_columns': [
+            'a.price',
+            'a.product_code',
+            'a.product_name',
+            'a.product_image_b_format_url',
+            'a.product_type_id',
+            'a.product_type_path',
+            'a.product_use_stock',
+            'a.product_sale_type_id',
+            'a.product_search_codes',
+            'a.product_type_node_left',
+            'a.product_change_cost_on_sales',
+            'a.stock',
+            'a.cost',
+            'a.product_name_meli',
+            'a.description',
+            'a.brand',
+            'a.meli_id',
+            'a.drive_url',
+            'a.status',
+            'a.reason',
+            'a.remedy',
+            'a.catalog_link',
+            'a.permalink',
+            'a.is_scrapped',
+            'a.price_mercadolibre',
+            'a.dimentions',
+            'a.model',
+            'a.price_tienda_nube',
+            'a.product_category',
+            'b.id as attribute_id',
+            'b.item_id',
+            'b.seo_title',
+            'b.seo_description',
+            'b.barcode',
+            'b.video_url',
+            'b.tags',
+            'b.promotional_price',
+            'b.mpn',
+            'b.age_group',
+            'b.gender',
+            'c.attribute_id',
+            'c.product_id',
+            'c.variant_id',
+            'd.id as category_id', 
+            'd.name as category_name',
+            'e.settings'
+        ],
+        'q_from':f'FROM {SCHEMA_INVENTORY}.{PRODUCTS_TABLE} as a',
+        'q_join': [
+            f'LEFT JOIN {SCHEMA_TNUBE}.{ATTRIBUTES_TABLE} as b on b.item_id = a.id',
+            f'LEFT JOIN {SCHEMA_TNUBE}.{PRODUCT_STATUS_TABLE} as c on b.id = c.attribute_id ',
+            f'LEFT JOIN {SCHEMA_TNUBE}.{CATEGORIES_TABLE} as d on d.name = a.product_type_path',
+            f'LEFT JOIN {SCHEMA_MELI}.{ATTRIBUTES_TABLE} as e on e.item_id = a.id',],
+        'q_where': f'WHERE a.id = {item_id}',
+        'q_limit':'LIMIT 1'
+    }
+    item_data = get_method(query)
+    return item_data
+
+
 def aux_base_products_url():
     token, user_id = tienda_nube_secrets()
     url_base = f"https://api.tiendanube.com/v1/{user_id}/products"
@@ -17,6 +90,7 @@ def aux_base_products_url():
         "Authentication": f"bearer {token}",
         "Content-Type": "application/json"}
     return url_base, headers
+
 
 def aux_format_data(item_id):
 
@@ -44,13 +118,15 @@ def aux_format_data(item_id):
         else:
             return {}
         
-    data = get_tienda_nube_item_data(item_id)
+    data = get_data_for_tnube(item_id)
+
     dimtions_norm = _aux_dimentions(data)
     attribute_id = data.get("attribute_id")
     product_id = data.get("product_id", None)
     variant_id = data.get("variant_id", None)
 
-    public_images = process_images_storage(item_id)
+    #public_images = process_images_storage(item_id)
+    public_images=[]
     if public_images == []:
         logger.info("Public Images in Drive not founded, using image from Bitcram..")
         public_images = [{'src': data["product_image_b_format_url"]}]
@@ -62,7 +138,6 @@ def aux_format_data(item_id):
     category_id = data.get("category_id",None)
     if  category_id == None:
         category_id = 39076803
-
 
 
     if data.get("product_name_meli") == None:
@@ -84,7 +159,7 @@ def aux_format_data(item_id):
         "description": {"es": data.get("description", None)},
         "seo_title": {"es": product_name},
         "seo_description": {"es": data.get("seo_description", None)},
-        "free_shipping": free_shipping if free_shipping else False,
+        "free_shipping": True if free_shipping.lower() == 'true' else False,
         "brand": data.get("brand", None),
         "video_url": data.get("video_url", None),
         "images": public_images,
