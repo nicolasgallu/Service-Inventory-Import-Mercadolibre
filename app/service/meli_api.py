@@ -6,6 +6,7 @@ from app.utils.logger import logger
 from app.service.llm_api import call_deepseek_api
 from app.service.notifications import enviar_mensaje_whapi
 from app.service.database import update_method, get_method, upsert_method
+from app.service.google_pictures import process_images_storage
 from app.settings.config import TOKEN_WHAPI, PHONE_INTERNAL, SCHEMA_INVENTORY, SCHEMA_MERCADOLIBRE
 
 ATTRIBUTES_TABLE = 'attributes'
@@ -29,9 +30,8 @@ def ai_error_handling(api_response, user_message, item_id):
     'id': {'value': item_id, 'type': 'char'},
     'status': {'value': 'Error.', 'type': 'char'},
     'reason': {'value': error_clean, 'type': 'char'},
-    'remedy': {'value': None, 'type': 'null'},
+    'remedy': {'value': None, 'type': 'char'},
     }
-    logger.error(message)
     enviar_mensaje_whapi(TOKEN_WHAPI, PHONE_INTERNAL, message)
     update_method(data, SCHEMA_INVENTORY, PRODUCTS_TABLE)
 
@@ -63,7 +63,7 @@ def get_data_for_meli(item_id):
             'b.settings'
         ],
         'q_from':f'FROM {SCHEMA_INVENTORY}.{PRODUCTS_TABLE} as a',
-        'q_join':f'LEFT JOIN {SCHEMA_MERCADOLIBRE}.{ATTRIBUTES_TABLE} as b on b.item_id = a.id',
+        'q_join':[f'LEFT JOIN {SCHEMA_MERCADOLIBRE}.{ATTRIBUTES_TABLE} as b on b.item_id = a.id'],
         'q_where': f'WHERE a.id = {item_id}',
         'q_limit':'LIMIT 1'
     }
@@ -71,9 +71,16 @@ def get_data_for_meli(item_id):
     return item_data
 
 
-def _aux_product_format(item_data, public_images):
+def _aux_product_format(item_data):
     """"""
     logger.info("Creating Product Schema for Mercadolibre.")
+
+    item_id = item_data['id']
+    #public_images = process_images_storage(item_id)
+    public_images=[]
+    if public_images == []:
+        logger.info("Without images in Folder, using image from Bitcram.")
+        public_images = [{'source': item_data["product_image_b_format_url"]}]
 
     product_name = item_data["product_name_meli"] or item_data["product_name"]
     price = item_data["price_mercadolibre"] or item_data["price"]
@@ -306,11 +313,11 @@ def _settings_builder(item_id, category_id, price, token):
     update_method(data, SCHEMA_MERCADOLIBRE, ATTRIBUTES_TABLE)
 
 
-def prepublish_product(item_data:dict, token:str):
+def prepublish_product(item_id, token):
     """"""
     logger.info("Running Pre-Publish Action on Mercadolibre")
-
-    item_id = item_data['id']
+    
+    item_data = get_data_for_meli(item_id)
     product_name = item_data["product_name_meli"] or item_data["product_name"]
     price = item_data["price_mercadolibre"] or item_data["price"]
     category_options = item_data['category_options']
@@ -340,12 +347,11 @@ def prepublish_product(item_data:dict, token:str):
         update_method(data, SCHEMA_MERCADOLIBRE, ATTRIBUTES_TABLE)
 
 
-def publish_item(item_data, public_images, token):
+def publish_item(item_id, token):
     """publish the item with a second try option"""
 
     logger.info("Running Publish Action on Mercadolibre")
-
-    item_id = item_data['id']
+    item_data = get_data_for_meli(item_id)
     logger.info("Step 1: Checking if product is already publish.")
     if item_data['meli_id']:
         logger.warning(f"""Item: {item_id} already exists in mercadolibre 
@@ -353,7 +359,7 @@ def publish_item(item_data, public_images, token):
         return
     
     logger.info("Step 2: Attempting to publish the product in mercadolibre.")
-    item_format = _aux_product_format(item_data, public_images)
+    item_format = _aux_product_format(item_data)
     response = requests.post("https://api.mercadolibre.com/items", 
                     json=item_format,
                     headers={"Authorization": f"Bearer {token}"})
@@ -400,11 +406,11 @@ def publish_item(item_data, public_images, token):
 
 
 
-def update_item(item_id, item_data, public_images, token):
+def update_item(item_id, token):
     """Update MercadoLibre item"""
     
     logger.info("Running Update Action on Mercadolibre")
-    
+    item_data = get_data_for_meli(item_id)
     meli_id = item_data['meli_id']
     if meli_id is None or meli_id == '':
         logger.error(f"Item: {item_data['id']} is not published, nothing to update.")
@@ -428,20 +434,23 @@ def update_item(item_id, item_data, public_images, token):
     if status == 'under_review' and sub_status == 'forbidden':
         logger.info(f"Product in Forbidden status: {meli_id}, we are gonna delete and publish again.")
         delete_item(item_data, token)
-        publish_item(item_data, public_images, token)
+        publish_item(item_data, token)
         return
     
     else:
-        item_format = _aux_product_format(item_data, public_images)
+        item_format = _aux_product_format(item_data)
 
+        listing_type_id = item_format.get('listing_type_id')
         del item_format['category_id']
         del item_format['currency_id']
         del item_format['condition']
         del item_format['attributes']
-        del item_format['buying_mode']
-
-        listing_type_id = item_format.get('listing_type_id')
+        del item_format['buying_mode']        
+        del item_format['shipping']
         del item_format['listing_type_id']
+
+        if sold_quantity > 0:
+            del item_format["title"]
 
         def _aux_update_listing():
             data = {"id": listing_type_id}
@@ -468,26 +477,20 @@ def update_item(item_id, item_data, public_images, token):
                 _set_description(meli_id, item_data['description'], token, update=True)
                 _aux_update_listing()
                 _aux_reactivate_item()
-                return
             else:
                 user_message = f"Error while updating product: {meli_id}"
+                logger.info(response.json())
                 ai_error_handling(response, user_message, item_id)
-
-        if sold_quantity > 0:
-            logger.info(f"Product: {meli_id} has one sell or more.")
-            del item_format["title"]
-            _aux_update_item()
-        else:
-            logger.info(f"Product: {meli_id} has no sells.")
-            _aux_update_item()
+        
+        _aux_update_item()
 
  
 
-        
-def pause_item(item_data, token):
+def pause_item(item_id, token):
     """Changes item status to paused in Mercado Libre"""
 
     logger.info("Running Pause Action on Mercadolibre")
+    item_data = get_data_for_meli(item_id)
     meli_id = item_data['meli_id'] 
 
     if meli_id is None:
@@ -512,13 +515,12 @@ def pause_item(item_data, token):
         return
 
 
-def delete_item(item_data, token): 
+def delete_item(item_id, token):
     """"""
 
     logger.info("Running Delete Action on Mercadolibre")
-
+    item_data = get_data_for_meli(item_id)
     meli_id = item_data['meli_id'] 
-    item_id = item_data['id']
 
     if meli_id is None:
         logger.error(f"Product: {item_id} is not published, nothing to delete.")
@@ -533,11 +535,11 @@ def delete_item(item_data, token):
 
     data = {
         'id': {'value': item_id, 'type': 'char'},
-        'status': {'value': None, 'type': 'null'},
-        'reason': {'value': None, 'type': 'null'},
-        'remedy': {'value': None, 'type': 'null'},
-        'permalink': {'value': None, 'type': 'null'},
-        'meli_id': {'value': None, 'type': 'null'},
+        'status': {'value': None, 'type': 'char'},
+        'reason': {'value': None, 'type': 'char'},
+        'remedy': {'value': None, 'type': 'char'},
+        'permalink': {'value': None, 'type': 'char'},
+        'meli_id': {'value': None, 'type': 'char'},
         }
     update_method(data, SCHEMA_INVENTORY, PRODUCTS_TABLE)
 
