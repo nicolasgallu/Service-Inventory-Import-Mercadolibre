@@ -6,7 +6,7 @@ from app.settings.config import (
     USER_DB, 
     PASSWORD_DB, 
     NAME_DB, 
-    SCHEMA_APP_PRODUCT_SYNC
+    SCHEMA_INVENTORY
     )
 
 def getconn():
@@ -67,108 +67,15 @@ def get_tienda_nube_id(id):
         return data
 
 
-def get_tienda_nube_item_data(item_id):
-    """"""
-    with engine.begin() as conn:
-        logger.info(f"Extracting data from item: {item_id}.")
-        result = conn.execute(
-            text(f"""
-                SELECT 
-                 a.*,
-                 b.*,
-                 c.product_id,
-                 c.variant_id,
-                 d.category_id 
-                 
-                FROM {SCHEMA_APP_PRODUCT_SYNC}.product_catalog_sync as a
-                LEFT JOIN (
-                SELECT 
-                    id as attribute_id,
-                    item_id,
-                    seo_title,
-                    seo_description,
-                    barcode,
-                    video_url,
-                    tags,
-                    promotional_price,
-                    mpn,
-                    age_group,
-                    gender
-                FROM tienda_nube.attributes) as b ON a.id = b.item_id 
-                
-                LEFT JOIN (
-                SELECT
-                    attribute_id,
-                    product_id,
-                    variant_id
-                FROM 
-                    tienda_nube.product_status) as c ON b.attribute_id = c.attribute_id
-                 
-                LEFT JOIN 
-                 (select id as category_id, name as category_name from tienda_nube.categories) as d
-                 ON d.category_name = a.product_type_path
-                
-                WHERE a.id = {item_id};
-            """)
-        )
-        #REVISAR PORQUE ADOPTE ESTE DISEÑO (BATCH)
-        data = [dict(row) for row in result.mappings()]
-        if len(data) > 1:
-            return data
-        else:
-            return data[0]
-            
-
-def load_tienda_nube_product_status(data):
-    """writting field description or title using ai reply,
-    this is part from the pre-publish event."""
-    with engine.begin() as conn:
-        logger.info(f"Saving tienda nube product status.")
-        conn.execute(
-            text(f"""
-                INSERT INTO tienda_nube.product_status (
-                attribute_id,
-                product_id,
-                variant_id,
-                response,
-                updated_at)
-                VALUES (
-                :attribute_id,
-                :product_id,
-                :variant_id,
-                :response,
-                :updated_at) ON DUPLICATE KEY UPDATE
-                product_id = :product_id,
-                variant_id = :variant_id,
-                response = :response,
-                updated_at = :updated_at
-            """),data) 
-        logger.info("Load Completed.")
-
-
-def delete_tienda_nube_product_status(data):
-    """writting field description or title using ai reply,
-    this is part from the pre-publish event."""
-    with engine.begin() as conn:
-        logger.info(f"Deleting tienda nube product status.")
-        conn.execute(
-            text(f"""
-                delete from tienda_nube.product_status
-                where attribute_id = :attribute_id
-            """),data) 
-        logger.info("delete completed.")
-
-
-
 def get_method(data):
-    """"""
+    """returns a single row of a get sql"""
     with engine.begin() as conn:
 
         q_columns = ', '.join(data.get('q_columns'))
         q_from = data.get('q_from')
-        q_join = data.get('q_join', None)
-        q_where  = data.get('q_where', None)
-        q_limit  = data.get('q_limit', None)
+        q_join =  ' '.join(data.get('q_join', ''))
+        q_where  = data.get('q_where', '')
+        q_limit  = data.get('q_limit', '')
 
         result = conn.execute(
             text(f"""
@@ -180,10 +87,10 @@ def get_method(data):
                 {q_limit}
                 """)
             )
-        data = [dict(row) for row in result.mappings()][0]
+        data = [dict(row) for row in result.mappings()]
         if data:
             logger.info("Data extraction completed.")
-            return data
+            return data[0]
         else:
             logger.info("Data extraction failed.")
             return None
@@ -195,7 +102,7 @@ def get_item_data(item_id):
         logger.info(f"Extracting data from item: {item_id}.")
         result = conn.execute(
             text(f"""
-                SELECT * FROM {SCHEMA_APP_PRODUCT_SYNC}.product_catalog_sync
+                SELECT * FROM {SCHEMA_INVENTORY}.product_catalog_sync
                 WHERE id = {item_id};
             """)
         )
@@ -281,7 +188,8 @@ def update_method(data:dict, schema:str, table:str):
         value_type= data.get(field).get('type')
         if value_type == 'boolean':
             aux_query+= f"{field} = {value}"
-        elif value_type == 'null':
+        elif value == None:
+        #elif value_type == 'null':
             aux_query+= f"{field} = null"
         else:
             aux_query+= f"{field} = CAST('{value}' AS {value_type})"
@@ -347,35 +255,6 @@ def insert_order(order, platform):
         logger.info("Load Completed.")
 
 
-def db_tiendanube_category(operation:str, data:str):
-    """
-    Returns True/False if category name exists (using 'get')
-    Insert new record (using 'post')
-    """
-    with engine.begin() as conn:
-        logger.info(f"{operation} operation over tienda_nube.categories.")
-
-        if operation == 'get':
-            result = conn.execute(
-                text(f"""SELECT name 
-                     from tienda_nube.categories 
-                     where LOWER(name) = '{data.lower()}'
-                     limit 1"""))
-            
-            data = [dict(row) for row in result.mappings()]
-            if data:
-                return True
-            else:
-                return False
-
-        elif operation == 'post':
-            conn.execute(
-                text(f"""
-                    INSERT IGNORE INTO tienda_nube.categories (id, name, data)
-                    VALUES (:id, :name, :data)
-                """),data) 
-        logger.info(f"Operation {operation} Completed.")
-
 def get_bitcram_data(meli_id):
     """"""
     with engine.begin() as conn:
@@ -389,7 +268,7 @@ def get_bitcram_data(meli_id):
                       a.id,
                       a.cost,
                       1 as aux_priority 
-                      from {SCHEMA_APP_PRODUCT_SYNC}.product_catalog_sync as a
+                      from {SCHEMA_INVENTORY}.product_catalog_sync as a
                       where a.meli_id = '{meli_id}'
                       limit 1
                       ),
@@ -402,7 +281,7 @@ def get_bitcram_data(meli_id):
                       b.cost,
                       2 as aux_priority 
                       from mercadolibre.catalog_listing as a
-                      left join {SCHEMA_APP_PRODUCT_SYNC}.product_catalog_sync as b on a.meli_id = b.meli_id
+                      left join {SCHEMA_INVENTORY}.product_catalog_sync as b on a.meli_id = b.meli_id
                       where a.catalog_product_id in (
                         select catalog_product_id 
                         from mercadolibre.catalog_listing 

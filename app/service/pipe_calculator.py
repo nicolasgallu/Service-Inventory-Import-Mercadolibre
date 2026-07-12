@@ -11,5 +11,6 @@ def calculating_cost(response):
     item_data = get_data_for_meli(item_id)
     if item_data.get('category_options') == None:
         _generate_category_options(item_id, item_data.get('product_name'), token)
+        return
 
     calculate_cost(item_data, user_id, token)
