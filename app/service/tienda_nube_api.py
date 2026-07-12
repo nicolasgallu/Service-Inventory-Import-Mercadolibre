@@ -336,5 +336,3 @@ def create_categories(category_name):
             upsert_method(db_data, SCHEMA_TNUBE, CATEGORIES_TABLE)
         else:
             logger.error(f'Error creating category {category_name} : {response.json()}')
-
-            
