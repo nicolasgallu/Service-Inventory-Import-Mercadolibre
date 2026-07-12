@@ -76,8 +76,7 @@ def _aux_product_format(item_data):
     logger.info("Creating Product Schema for Mercadolibre.")
 
     item_id = item_data['id']
-    #public_images = process_images_storage(item_id)
-    public_images=[]
+    public_images = process_images_storage(item_id)
     if public_images == []:
         logger.info("Without images in Folder, using image from Bitcram.")
         public_images = [{'source': item_data["product_image_b_format_url"]}]

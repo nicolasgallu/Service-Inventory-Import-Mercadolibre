@@ -12,11 +12,11 @@ from unidecode import unidecode
 from app.utils.logger import logger
 from app.settings.config import SCHEMA_INVENTORY,SCHEMA_MERCADOLIBRE,SCHEMA_TNUBE
 
-
 PRODUCTS_TABLE='product_catalog_sync'
 ATTRIBUTES_TABLE='attributes'
 PRODUCT_STATUS_TABLE='product_status'
 CATEGORIES_TABLE='categories'
+
 
 def get_data_for_tnube(item_id):
     """"""
@@ -116,8 +116,7 @@ def aux_format_data(item_id):
     product_id = data.get("product_id", None)
     variant_id = data.get("variant_id", None)
 
-    #public_images = process_images_storage(item_id)
-    public_images=[]
+    public_images = process_images_storage(item_id)
     if public_images == []:
         logger.info("Public Images in Drive not founded, using image from Bitcram..")
         public_images = [{'src': data["product_image_b_format_url"]}]
