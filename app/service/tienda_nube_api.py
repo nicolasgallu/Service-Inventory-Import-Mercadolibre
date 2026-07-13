@@ -116,8 +116,7 @@ def aux_format_data(item_id):
     product_id = data.get("product_id", None)
     variant_id = data.get("variant_id", None)
 
-    #public_images = process_images_storage(item_id)
-    public_images=[]
+    public_images = process_images_storage(item_id)
     if public_images == []:
         logger.info("Public Images in Drive not founded, using image from Bitcram..")
         public_images = [{'src': data["product_image_b_format_url"]}]
@@ -130,13 +129,16 @@ def aux_format_data(item_id):
     category_id = data["category_id"] or 39076803
     product_name = data["product_name_meli"] or data["product_name"]
 
-    all_settings_groups = json.loads(data.get("settings"))
-    for settings_group in all_settings_groups:
-        for section_name in settings_group:
-            if section_name == "shipping":
-                for variable in settings_group[section_name]:
-                    if variable.get('id') == 'FREE_SHIPPING':
-                        free_shipping = variable.get('user_input_value')
+    all_settings_groups = data.get("settings")
+    free_shipping='false'
+    if all_settings_groups is not None:
+        all_settings_groups = json.loads(all_settings_groups)
+        for settings_group in all_settings_groups:
+            for section_name in settings_group:
+                if section_name == "shipping":
+                    for variable in settings_group[section_name]:
+                        if variable.get('id') == 'FREE_SHIPPING':
+                            free_shipping = variable.get('user_input_value')
 
     product_data = {
         "name": {"es": product_name},
@@ -246,44 +248,44 @@ def tienda_nube_update_item(item_id):
         update_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
         return
 
-    logger.info("Step 2: Upadting Product (variant)")
-    response = requests.put(url_upd_variant, headers=headers, data=json.dumps(variant_data[0]))
-    if response.status_code == 200:
-        logger.info("Step 2: Done")
-    else:
-        logger.error("variant failed to update")
-        db_data['response']['value'] = f"Failed to update: {json.dumps(response.json(), ensure_ascii=False)}"
-        db_data['updated_at']['value'] = datetime.now()
-        update_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
-        return
-
-    logger.info("Step 3: Upadting Product (images)")
-    response = requests.get(url_upd_image, headers=headers)
-    product_images = response.json()
-    for p_image in product_images:
-        id = p_image['id']
-        response = requests.delete(f"{url_upd_image}/{id}", headers=headers)
-        if response.status_code == 200:
-            logger.info("image deleted correctly")
-        else:
-            logger.info(f"error deleting image {id}")
-
-    for image in images:
-        response = requests.post(url_upd_image, headers=headers, data=json.dumps(image))
-        if response.status_code == 201:
-            logger.info("image correctly loaded")
-            continue
-        else:
-            logger.error("images failed to update")
-            logger.info(str(response.json()))
-            continue
-
-    logger.info("Step 3: Done")
-    db_data['response']['value'] = 'producto correctamente actualizado'
-    db_data['updated_at']['value'] = datetime.now()
-    update_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
+    #logger.info("Step 2: Upadting Product (variant)")
+    #response = requests.put(url_upd_variant, headers=headers, data=json.dumps(variant_data[0]))
+    #if response.status_code == 200:
+    #    logger.info("Step 2: Done")
+    #else:
+    #    logger.error("variant failed to update")
+    #    db_data['response']['value'] = f"Failed to update: {json.dumps(response.json(), ensure_ascii=False)}"
+    #    db_data['updated_at']['value'] = datetime.now()
+    #    update_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
+    #    return
+#
+    #logger.info("Step 3: Upadting Product (images)")
+    #response = requests.get(url_upd_image, headers=headers)
+    #product_images = response.json()
+    #for p_image in product_images:
+    #    id = p_image['id']
+    #    response = requests.delete(f"{url_upd_image}/{id}", headers=headers)
+    #    if response.status_code == 200:
+    #        logger.info("image deleted correctly")
+    #    else:
+    #        logger.info(f"error deleting image {id}")
+#
+    #for image in images:
+    #    response = requests.post(url_upd_image, headers=headers, data=json.dumps(image))
+    #    if response.status_code == 201:
+    #        logger.info("image correctly loaded")
+    #        continue
+    #    else:
+    #        logger.error("images failed to update")
+    #        logger.info(str(response.json()))
+    #        continue
+    #
+    #logger.info("Step 3: Done")
+    #db_data['response']['value'] = 'producto correctamente actualizado'
+    #db_data['updated_at']['value'] = datetime.now()
+    #update_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
+    #return
     return
-
 
 ###==========================DELETE=================================##
 def tienda_nube_delete_item(item_id):

@@ -175,6 +175,7 @@ def _aux_product_format(item_data):
             
             elif setting == 'listing':
                 item_format['listing_type_id'] = [v.get('user_input_value') for v in setting_dict[setting]][0]
+    
     return item_format
 
 
@@ -322,15 +323,15 @@ def prepublish_product(item_id, token):
     product_name = item_data["product_name_meli"] or item_data["product_name"]
     price = item_data["price_mercadolibre"] or item_data["price"]
     category_options = item_data['category_options']
+    category_id = item_data['category_id']
+    settings = item_data['settings']
     if category_options is None:
         _generate_category_options(item_id, product_name, token)
-        return
 
-    category_id = item_data['category_id']
-    if category_id is not None:
+    elif category_id is not None and settings is None:
         _settings_builder(item_id, category_id, price, token)
-        return
-    else:
+    
+    elif category_id is None and category_options is not None:
         data = {
         'item_id': {
             'value': item_id, 
