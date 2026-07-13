@@ -137,8 +137,8 @@ def upsert_method(data:dict, schema:str, table:str):
                 value_type = data.get(field).get('type')
                 if value_type == 'boolean':
                     return str(value)
-                elif value_type == 'null':
-                    return 'null'
+                elif value == None:
+                    return ''
                 else:
                     return f"CAST('{value}' AS {value_type})"
             
