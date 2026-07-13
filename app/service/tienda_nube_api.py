@@ -196,13 +196,13 @@ def tienda_nube_publish_item(item_id):
             db_data['variant_id']['value'] = response.json()['variants'][0]['id']
             db_data['response']['value'] = 'producto correctamente publicado'
             db_data['updated_at']['value'] = datetime.now()
-            update_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
+            upsert_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
         else:
             logger.info("product failed to be published!!")
             db_data['attribute_id']['value'] = attribute_id
             db_data['response']['value'] = f"Failed to publish: {json.dumps(response.json(), ensure_ascii=False)}"
             db_data['updated_at']['value'] = datetime.now()
-            update_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
+            upsert_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
     return
 
 

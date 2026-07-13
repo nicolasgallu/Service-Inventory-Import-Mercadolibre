@@ -188,9 +188,10 @@ def _generate_category_options(item_id, product_name, token):
         headers={"Authorization": f"Bearer {token}"}
     )
     if response.status_code == 200:
+        value = unidecode(json.dumps(response.json(), ensure_ascii=False).replace("'","").replace("\\n",""))
         data = {
             'item_id': {'value': item_id, 'type': 'char'},
-            'category_options': {'value': json.dumps(response.json()), 'type': 'json'},
+            'category_options': {'value': value , 'type': 'json'},
             'updated_at': {'value': datetime.now(), 'type': 'datetime'}
         }
         update_method(data, SCHEMA_MERCADOLIBRE, ATTRIBUTES_TABLE)  
