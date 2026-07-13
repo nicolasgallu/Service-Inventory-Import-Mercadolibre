@@ -55,7 +55,7 @@ delete = {
 category = {
     "site":"tienda-nube",
     "event_type":"create_category",
-    "name": "BELLEZA",
+    "name": "NAVIDAD",
     "secret":"mati-gordo"}
 
 requests.post(url=url, json=publishtnube)

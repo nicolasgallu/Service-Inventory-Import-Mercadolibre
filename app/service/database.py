@@ -174,7 +174,6 @@ def upsert_method(data:dict, schema:str, table:str):
 
 def update_method(data:dict, schema:str, table:str):
     """Dinamic Update Method.
-
         Attributes:
             data: dict, with the fields and values.
             in db, and the values required. (note, first key value would always be take as ID)
@@ -184,12 +183,11 @@ def update_method(data:dict, schema:str, table:str):
     aux_query = ""
     def _casting_value(field, data):
         nonlocal aux_query
-        value= data.get(field).get('value')
-        value_type= data.get(field).get('type')
+        value = data.get(field).get('value')
+        value_type = data.get(field).get('type')
         if value_type == 'boolean':
             aux_query+= f"{field} = {value}"
         elif value == None:
-        #elif value_type == 'null':
             aux_query+= f"{field} = null"
         else:
             aux_query+= f"{field} = CAST('{value}' AS {value_type})"

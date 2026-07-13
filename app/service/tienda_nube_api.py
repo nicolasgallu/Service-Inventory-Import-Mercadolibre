@@ -116,7 +116,8 @@ def aux_format_data(item_id):
     product_id = data.get("product_id", None)
     variant_id = data.get("variant_id", None)
 
-    public_images = process_images_storage(item_id)
+    #public_images = process_images_storage(item_id)
+    public_images=[]
     if public_images == []:
         logger.info("Public Images in Drive not founded, using image from Bitcram..")
         public_images = [{'src': data["product_image_b_format_url"]}]
@@ -172,6 +173,15 @@ def aux_format_data(item_id):
 
 ##==========================PUBLISH=================================##
 
+
+def _aux_generate_url(product_id):
+    """"""
+    url_base, headers = aux_base_products_url()
+    response = requests.get(f"{url_base}/{product_id}", headers=headers)
+    response.raise_for_status()
+    product = response.json()
+    return product["canonical_url"]
+
 def tienda_nube_publish_item(item_id):
     
     logger.info("publish process started")
@@ -184,6 +194,7 @@ def tienda_nube_publish_item(item_id):
             'product_id':{'value':None, 'type':'signed'},
             'variant_id':{'value':None, 'type':'signed'},
             'response':{'value':None, 'type':'char'},
+            'url':{'value':None, 'type':'char'},
             'updated_at':{'value':None, 'type':'datetime'},
         }
         url_base, headers = aux_base_products_url()
@@ -196,6 +207,7 @@ def tienda_nube_publish_item(item_id):
             db_data['variant_id']['value'] = response.json()['variants'][0]['id']
             db_data['response']['value'] = 'producto correctamente publicado'
             db_data['updated_at']['value'] = datetime.now()
+            db_data['url']['value'] = _aux_generate_url(response.json()['id'])
             upsert_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
         else:
             logger.info("product failed to be published!!")
