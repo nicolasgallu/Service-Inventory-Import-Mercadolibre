@@ -180,7 +180,7 @@ def tienda_nube_publish_item(item_id):
         logger.info("product already published, nothing to do.")
     else:
         db_data = {
-            'attribute_id':{'value':None, 'type':'signed'},
+            'attribute_id':{'value':attribute_id, 'type':'signed'},
             'product_id':{'value':None, 'type':'signed'},
             'variant_id':{'value':None, 'type':'signed'},
             'response':{'value':None, 'type':'char'},
@@ -199,7 +199,6 @@ def tienda_nube_publish_item(item_id):
             upsert_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
         else:
             logger.info("product failed to be published!!")
-            db_data['attribute_id']['value'] = attribute_id
             db_data['response']['value'] = f"Failed to publish: {json.dumps(response.json(), ensure_ascii=False)}"
             db_data['updated_at']['value'] = datetime.now()
             upsert_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
@@ -271,6 +270,7 @@ def tienda_nube_update_item(item_id):
     db_data['response']['value'] = 'producto correctamente actualizado'
     db_data['updated_at']['value'] = datetime.now()
     update_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
+    return
 
 
 ###==========================DELETE=================================##
@@ -307,7 +307,7 @@ def create_categories(category_name):
     logger.info("Creating Category process started")
     if get_category(category_name):
         logger.info(f"Category {category_name} already exists, nothing to do.")
-        return
+        
     else:
         token, user_id = tienda_nube_secrets()
         url = f"https://api.tiendanube.com/v1/{user_id}/categories"
@@ -331,8 +331,10 @@ def create_categories(category_name):
             db_data = {
                 'id':{'value':catgory_id, 'type':'signed'},
                 'name':{'value':catgory_name, 'type':'char'},
-                'data':{'value':unidecode(json.dumps(catgory_info, ensure_ascii=False).replace("'","").replace("\\n","")), 'type':'json'},
+                'data':{'value':unidecode(json.dumps(catgory_info, ensure_ascii=False).replace("'","").replace("\\n","")), 'type': 'json'},
             }
             upsert_method(db_data, SCHEMA_TNUBE, CATEGORIES_TABLE)
         else:
             logger.error(f'Error creating category {category_name} : {response.json()}')
+
+    return

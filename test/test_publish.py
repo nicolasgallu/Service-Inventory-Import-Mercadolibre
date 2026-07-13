@@ -1,10 +1,9 @@
 import requests
 
 url = "http://127.0.0.1:8080/webhooks/publications"
-
 ##LIMPIAR DATA DE TNUBE TEST EN PRODU DE EMIL...
 
-id = 191377
+id = 205378
 
 publishtnube = {
     "site":"tienda-nube",
@@ -59,4 +58,4 @@ category = {
     "name": "BELLEZA",
     "secret":"mati-gordo"}
 
-requests.post(url=url, json=deltnube)
+requests.post(url=url, json=publishtnube)

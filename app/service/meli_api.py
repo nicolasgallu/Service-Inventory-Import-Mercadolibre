@@ -194,10 +194,11 @@ def _generate_category_options(item_id, product_name, token):
             'category_options': {'value': value , 'type': 'json'},
             'updated_at': {'value': datetime.now(), 'type': 'datetime'}
         }
-        update_method(data, SCHEMA_MERCADOLIBRE, ATTRIBUTES_TABLE)  
+        update_method(data, SCHEMA_MERCADOLIBRE, ATTRIBUTES_TABLE)
     else:
         logger.error(f"Failed to create Category Options {response.text}")
-        return
+    
+    return
 
 
 def _settings_builder(item_id, category_id, price, token):
@@ -345,6 +346,8 @@ def prepublish_product(item_id, token):
             }
         }
         update_method(data, SCHEMA_MERCADOLIBRE, ATTRIBUTES_TABLE)
+    
+    return
 
 
 def publish_item(item_id, token):
@@ -396,13 +399,11 @@ def publish_item(item_id, token):
             },
         }
         update_method(data, SCHEMA_INVENTORY, PRODUCTS_TABLE)
-        return
-    
     else:
         user_message = f"Error while publishing item: {item_id}"
         logger.info(response.json())
         ai_error_handling(response, user_message, item_id)
-        return
+    return
 
 
 
@@ -435,7 +436,6 @@ def update_item(item_id, token):
         logger.info(f"Product in Forbidden status: {meli_id}, we are gonna delete and publish again.")
         delete_item(item_data, token)
         publish_item(item_data, token)
-        return
     
     else:
         item_format = _aux_product_format(item_data)
@@ -484,6 +484,8 @@ def update_item(item_id, token):
         
         _aux_update_item()
 
+    return
+
  
 
 def pause_item(item_id, token):
@@ -504,7 +506,6 @@ def pause_item(item_id, token):
     )
     if response.status_code == 200:
         logger.info(f"Product: {meli_id} successfully paused.")
-        return
     else:
         logger.error(f"""
             Failed to pause item {meli_id}.\n 
@@ -512,7 +513,7 @@ def pause_item(item_id, token):
             Error:\n {response.json()}"""
         )
         enviar_mensaje_whapi(TOKEN_WHAPI, PHONE_INTERNAL, response.json())
-        return
+    return
 
 
 def delete_item(item_id, token):
@@ -542,6 +543,7 @@ def delete_item(item_id, token):
         'meli_id': {'value': None, 'type': 'char'},
         }
     update_method(data, SCHEMA_INVENTORY, PRODUCTS_TABLE)
+    return
 
     
 def _set_description(meli_id, description, token, update=False):
@@ -647,3 +649,4 @@ def calculate_cost(item_data:dict, user_id:str, token:str):
     cost_detail['total_selling_cost'] = {'value': total_selling_cost, 'type': 'float'}
     
     upsert_method(cost_detail, SCHEMA_MERCADOLIBRE, COSTS_TABLE )
+    return
