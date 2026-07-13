@@ -18,7 +18,7 @@ def ai_call_prepublish(data, item_id):
 
     if not product_name_meli:
         logger.info("AI Automatic - Creating Product Name Improved.")
-        sys_prompt = get_ai_prompt('ai_generate_name')
+        sys_prompt = get_ai_prompt('ai_generate_title')
         user_prompt = {
             "original_name": original_title}
         ai_response = call_deepseek_api(sys_prompt, user_prompt)

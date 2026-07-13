@@ -2,7 +2,7 @@ import requests
 
 url = "http://127.0.0.1:8080/webhooks/publications"
 
-id = 194474
+id = 195205
 
 publishtnube = {
     "site":"tienda-nube",
@@ -57,4 +57,4 @@ category = {
     "name": "NAVIDAD",
     "secret":"mati-gordo"}
 
-requests.post(url=url, json=pre_publish)
+requests.post(url=url, json=publish)

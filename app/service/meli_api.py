@@ -36,6 +36,7 @@ def ai_error_handling(api_response, user_message, item_id):
     update_method(data, SCHEMA_INVENTORY, PRODUCTS_TABLE)
 
 
+
 def get_data_for_meli(item_id):
     """"""
     query = {
@@ -70,6 +71,36 @@ def get_data_for_meli(item_id):
     item_data = get_method(query)
     return item_data
 
+
+def is_valid_gtin(gtin):
+    """
+    Valida códigos GTIN-8, GTIN-12, GTIN-13 y GTIN-14.
+    """
+    gtin = str(gtin).strip()
+
+    # Largo válido
+    if len(gtin) not in (8, 12, 13, 14):
+        return False
+
+    # Solo números
+    if not gtin.isdigit():
+        return False
+
+    digits = [int(d) for d in gtin]
+    check_digit = digits[-1]
+    body = digits[:-1]
+
+    # Se recorre de derecha a izquierda alternando pesos 3 y 1
+    total = 0
+    weight = 3
+
+    for digit in reversed(body):
+        total += digit * weight
+        weight = 1 if weight == 3 else 3
+
+    calculated = (10 - (total % 10)) % 10
+
+    return calculated == check_digit
 
 def _aux_product_format(item_data):
     """"""
@@ -128,21 +159,32 @@ def _aux_product_format(item_data):
         "sale_terms": []
     }
 
-    if len(item_data['product_code']) not in [8,12,13,14]:
+    if not is_valid_gtin(item_data['product_code']):
         product_code = {
-            "id": "SELLER_SKU", 
-            "value_name": item_data['product_code']}
+            "id": "SELLER_SKU",
+            "value_name": item_data['product_code']
+        }   
+
         attr_gtin = {
-            "id": "GTIN", 
-            "value_name": "N/A"}
+            "id": "GTIN",
+            "value_name": "N/A"
+        }   
+
         gtin_reason = {
-            "id": "EMPTY_GTIN_REASON", 
-            "value_id": "17055160"}
+            "id": "EMPTY_GTIN_REASON",
+            "value_id": "17055160"
+        }   
+
         item_format['attributes'].append(product_code)
         item_format['attributes'].append(attr_gtin)
-        item_format['attributes'].append(gtin_reason)
+        item_format['attributes'].append(gtin_reason)   
+
     else:
-        product_code = {"id": "GTIN", "value_name": item_data['product_code']}
+        product_code = {
+            "id": "GTIN",
+            "value_name": item_data['product_code']
+        }   
+
         item_format['attributes'].append(product_code)
 
     for setting_dict in settings:
