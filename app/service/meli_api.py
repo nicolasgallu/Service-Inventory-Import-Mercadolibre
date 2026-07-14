@@ -78,11 +78,9 @@ def is_valid_gtin(gtin):
     """
     gtin = str(gtin).strip()
 
-    # Largo válido
     if len(gtin) not in (8, 12, 13, 14):
         return False
 
-    # Solo números
     if not gtin.isdigit():
         return False
 
@@ -90,16 +88,13 @@ def is_valid_gtin(gtin):
     check_digit = digits[-1]
     body = digits[:-1]
 
-    # Se recorre de derecha a izquierda alternando pesos 3 y 1
     total = 0
     weight = 3
-
     for digit in reversed(body):
         total += digit * weight
         weight = 1 if weight == 3 else 3
 
     calculated = (10 - (total % 10)) % 10
-
     return calculated == check_digit
 
 def _aux_product_format(item_data):
@@ -108,6 +103,7 @@ def _aux_product_format(item_data):
 
     item_id = item_data['id']
     public_images = process_images_storage(item_id)
+    #public_images=[]
     if public_images == []:
         logger.info("Without images in Folder, using image from Bitcram.")
         public_images = [{'source': item_data["product_image_b_format_url"]}]
@@ -366,11 +362,14 @@ def prepublish_product(item_id, token):
     price = item_data["price_mercadolibre"] or item_data["price"]
     category_options = item_data['category_options']
     category_id = item_data['category_id']
-    settings = item_data['settings']
+    settings = json.loads(item_data['settings'])
+    if settings:
+        settings_error_check = [i for i in settings][0].get('Error', False)
+
     if category_options is None:
         _generate_category_options(item_id, product_name, token)
 
-    elif category_id is not None and settings is None:
+    elif category_id is not None and (settings is None or settings_error_check):
         _settings_builder(item_id, category_id, price, token)
     
     elif category_id is None and category_options is not None:
@@ -380,7 +379,7 @@ def prepublish_product(item_id, token):
             'type': 'char'
             },
         'settings': {
-            'value': json.dumps([{'Error': 'Es necesario seleccionar una categoria.'}]), 
+            'value': json.dumps([{'Error': 'Para generar los settings es neceasario seleccionar una categoria y correr el evento de Pre-Publish.'}]), 
             'type': 'json'
             },
         'updated_at': {

@@ -28,22 +28,6 @@ engine = create_engine(
     )
 
 
-def get_ai_prompt(field):
-    with engine.begin() as conn:
-        logger.info(f"Extracting AI prompt: {field}.")
-        result = conn.execute(
-            text(f"""
-                SELECT 
-                    {field}
-                FROM mercadolibre.prompts
-                LIMIT1;
-            """)
-        )
-        data = [dict(row) for row in result.mappings()][0]
-        logger.info("Extraction Complete.")
-        return data
-
-
 def get_tienda_nube_id(id):
     """"""
     with engine.begin() as conn:
@@ -67,35 +51,6 @@ def get_tienda_nube_id(id):
         return data
 
 
-def get_method(data):
-    """returns a single row of a get sql"""
-    with engine.begin() as conn:
-
-        q_columns = ', '.join(data.get('q_columns'))
-        q_from = data.get('q_from')
-        q_join =  ' '.join(data.get('q_join', ''))
-        q_where  = data.get('q_where', '')
-        q_limit  = data.get('q_limit', '')
-
-        result = conn.execute(
-            text(f"""
-                SELECT 
-                {q_columns} 
-                {q_from} 
-                {q_join} 
-                {q_where} 
-                {q_limit}
-                """)
-            )
-        data = [dict(row) for row in result.mappings()]
-        if data:
-            logger.info("Data extraction completed.")
-            return data[0]
-        else:
-            logger.info("Data extraction failed.")
-            return None
-
-
 def get_item_data(item_id):
     """"""
     with engine.begin() as conn:
@@ -113,112 +68,6 @@ def get_item_data(item_id):
         else:
             logger.info("Data extraction failed.")
             return None
-
-
-def upsert_method(data:dict, schema:str, table:str):
-    """Dinamic Upsert Method.
-
-        Attributes:
-            data: dict, with the fields and values.
-            in db, and the values required. (note, first key value would always be take as ID)
-            schema: str, name of the schema in db.
-            table: str, name of the table in db.
-    """
-
-    try:
-        with engine.begin() as conn:
-            fields = [i for i in data.keys()]
-            logger.info("Preparing Data to Upsert.")
-            aux_query = ""
-            values = ""
-            
-            def _casting_value(field):
-                value = data.get(field).get('value')
-                value_type = data.get(field).get('type')
-                if value_type == 'boolean':
-                    return str(value)
-                elif value == None:
-                    return 'null'
-                else:
-                    return f"CAST('{value}' AS {value_type})"
-            
-            for field in fields:
-                value = data.get(field)
-                if field == fields[0]:
-                    values += _casting_value(field) + ", "
-                    id_val = data.get(field).get('value')
-                    continue
-                if field == fields[-1]:
-                    value_casted = _casting_value(field)
-                    values += value_casted
-                    aux_query+= f"{field} = {value_casted}"
-                else:
-                    value_casted = _casting_value(field)
-                    values += f"{value_casted}, "
-                    aux_query+= f"{field} = {value_casted}, "
-            
-            logger.info(f"Upsert of Record {id_val} on {schema}.{table}")
-            conn.execute(text(f"""
-                INSERT INTO {schema}.{table} ({', '.join(fields)})
-                VALUES ({values})
-                ON DUPLICATE KEY UPDATE
-                {aux_query}
-            """))
-            logger.info("Upsert Completed.")
-
-    except Exception as e:
-        logger.error(f"Error during data load: {str(e)}")
-        raise e
-
-
-
-def update_method(data:dict, schema:str, table:str):
-    """Dinamic Update Method.
-        Attributes:
-            data: dict, with the fields and values.
-            in db, and the values required. (note, first key value would always be take as ID)
-            schema: str, name of the schema in db.
-            table: str, name of the table in db.
-    """
-    aux_query = ""
-    def _casting_value(field, data):
-        nonlocal aux_query
-        value = data.get(field).get('value')
-        value_type = data.get(field).get('type')
-        if value_type == 'boolean':
-            aux_query+= f"{field} = {value}"
-        elif value == None:
-            aux_query+= f"{field} = null"
-        else:
-            aux_query+= f"{field} = CAST('{value}' AS {value_type})"
-
-    try:
-        with engine.begin() as conn:
-            fields = [i for i in data.keys()]
-                       
-            logger.info("Preparing Data to update.")
-            for field in fields:
-                if field == fields[0]:
-                    id_field = field
-                    id_val = data.get(field).get('value')
-
-                elif field == fields[-1]:
-                    _casting_value(field, data)
-                else:
-                    _casting_value(field, data)
-                    aux_query+=","
-            
-            logger.info(f"Updating Record {id_val} on {schema}.{table}")
-            conn.execute(text(f"""
-                UPDATE {schema}.{table}
-                SET {aux_query}
-                WHERE {id_field} = {id_val}
-            """))
-            logger.info("Update Completed.")
-
-    except Exception as e:
-        logger.error(f"Error during data load: {str(e)}")
-        raise e
 
 
 def get_order(order_id, platform):
@@ -313,3 +162,140 @@ def get_bitcram_data(meli_id):
         else:
             logger.info("Data extraction failed.")
             return None
+
+
+
+def get_method(data):
+    """returns a single row of a get sql"""
+    with engine.begin() as conn:
+
+        q_columns = ', '.join(data.get('q_columns'))
+        q_from = data.get('q_from')
+        q_join =  ' '.join(data.get('q_join', ''))
+        q_where  = data.get('q_where', '')
+        q_limit  = data.get('q_limit', '')
+
+        result = conn.execute(
+            text(f"""
+                SELECT 
+                {q_columns} 
+                {q_from} 
+                {q_join} 
+                {q_where} 
+                {q_limit}
+                """)
+            )
+        data = [dict(row) for row in result.mappings()]
+        if data:
+            logger.info("Data extraction completed.")
+            return data[0]
+        else:
+            logger.info("Data extraction failed.")
+            return None
+
+
+def upsert_method(data:dict, schema:str, table:str):
+    """Dinamic Upsert Method.
+
+        Attributes:
+            data: dict, with the fields and values.
+            in db, and the values required. (note, first key value would always be take as ID)
+            schema: str, name of the schema in db.
+            table: str, name of the table in db.
+    """
+
+    try:
+        with engine.begin() as conn:
+            fields = [i for i in data.keys()]
+            logger.info("Preparing Data to Upsert.")
+            aux_query = ""
+            values = ""
+            
+            def _casting_value(field):
+                value = data.get(field).get('value')
+                value_type = data.get(field).get('type')
+                if value_type == 'boolean':
+                    return str(value)
+                elif value == None:
+                    return 'null'
+                else:
+                    return f"CAST('{value}' AS {value_type})"
+            
+            for field in fields:
+                value = data.get(field)
+                if field == fields[0]:
+                    values += _casting_value(field) + ", "
+                    id_val = data.get(field).get('value')
+                    continue
+                if field == fields[-1]:
+                    value_casted = _casting_value(field)
+                    values += value_casted
+                    aux_query+= f"{field} = {value_casted}"
+                else:
+                    value_casted = _casting_value(field)
+                    values += f"{value_casted}, "
+                    aux_query+= f"{field} = {value_casted}, "
+            
+            logger.info(f"Upsert of Record {id_val} on {schema}.{table}")
+            conn.execute(text(f"""
+                INSERT INTO {schema}.{table} ({', '.join(fields)})
+                VALUES ({values})
+                ON DUPLICATE KEY UPDATE
+                {aux_query}
+            """))
+            logger.info("Upsert Completed.")
+
+    except Exception as e:
+        logger.error(f"Error during data load: {str(e)}")
+        raise e
+
+
+def update_method(data:dict, schema:str, table:str):
+    """Dinamic Update Method.
+        Attributes:
+            data: dict, with the fields and values.
+            in db, and the values required. (note, first key value would always be take as ID)
+            schema: str, name of the schema in db.
+            table: str, name of the table in db.
+    """
+    aux_query = ""
+    def _casting_value(field, data):
+        nonlocal aux_query
+        value = data.get(field).get('value')
+        value_type = data.get(field).get('type')
+        if value_type == 'boolean':
+            aux_query+= f"{field} = {value}"
+        elif value == None:
+            aux_query+= f"{field} = null"
+        else:
+            aux_query+= f"{field} = CAST('{value}' AS {value_type})"
+
+    try:
+        with engine.begin() as conn:
+            fields = [i for i in data.keys()]
+                       
+            logger.info("Preparing Data to update.")
+            for field in fields:
+                if field == fields[0]:
+                    id_field = field
+                    id_val = data.get(field).get('value')
+
+                elif field == fields[-1]:
+                    _casting_value(field, data)
+                else:
+                    _casting_value(field, data)
+                    aux_query+=","
+            
+            logger.info(f"Updating Record {id_val} on {schema}.{table}")
+            conn.execute(text(f"""
+                UPDATE {schema}.{table}
+                SET {aux_query}
+                WHERE {id_field} = {id_val}
+            """))
+            logger.info("Update Completed.")
+
+    except Exception as e:
+        logger.error(f"Error during data load: {str(e)}")
+        raise e
+
+

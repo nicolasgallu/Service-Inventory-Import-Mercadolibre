@@ -1,9 +1,8 @@
+test/
 .env
 venv-srvice-inventory-ecommerce/
 service_account.json
-test.ipynb
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-tests/
