@@ -267,7 +267,28 @@ def _settings_builder(item_id, category_id, price, token):
         for setting in setting_dict:
             logger.info(f"Building {setting}..")
             if setting == 'attributes':
-                response = requests.get(f"https://api.mercadolibre.com/categories/{category_id}/{setting}", headers=HEADER).json()
+                response = requests.get(f"https://api.mercadolibre.com/categories/{category_id}/{setting}", headers=HEADER)
+                if response.status_code > 300:
+                    logger.info("Category Not Valid.")
+                    data = {
+                    'item_id': {
+                        'value': item_id, 
+                        'type': 'char'
+                        },
+                    'settings': {
+                        'value': json.dumps([{'Error': response.json()}]), 
+                        'type': 'json'
+                        },
+                    'updated_at': {
+                            'value': datetime.now(), 
+                            'type': 'datetime'
+                        }
+                    }
+                    update_method(data, SCHEMA_MERCADOLIBRE, ATTRIBUTES_TABLE)
+                    return
+                else:
+                    response = response.json()
+                
 
             elif setting == 'sale_terms':
                 response = requests.get(f"https://api.mercadolibre.com/categories/{category_id}/{setting}", headers=HEADER).json()
@@ -322,7 +343,7 @@ def _settings_builder(item_id, category_id, price, token):
                     'value_type': 'list',
                     'value_max_lenght': '255'
                 }]
-                
+
             for i in response:
                 id = i.get('id')
                 if setting == 'attributes':
@@ -362,8 +383,9 @@ def prepublish_product(item_id, token):
     price = item_data["price_mercadolibre"] or item_data["price"]
     category_options = item_data['category_options']
     category_id = item_data['category_id']
-    settings = json.loads(item_data['settings'])
+    settings = item_data['settings']
     if settings:
+        settings = json.loads(settings)
         settings_error_check = [i for i in settings][0].get('Error', False)
 
     if category_options is None:
