@@ -213,21 +213,28 @@ def _aux_product_format(item_data):
             
             elif setting == 'listing':
                 item_format['listing_type_id'] = [v.get('user_input_value') for v in setting_dict[setting]][0]
+
+    logger.info(item_format)           
     
     return item_format
 
 
-def _generate_category_options(item_id, product_name, token):
+def _generate_category_options(item_id, product_names, token):
     """ Generate category ID trough Mercadolibre API.
         If Categoty already exists then returns None.
     """
     logger.info("Generating Category Options")
-    response = requests.get("https://api.mercadolibre.com/sites/MLA/domain_discovery/search", 
-        params={"q": product_name, "limit": 6}, 
-        headers={"Authorization": f"Bearer {token}"}
-    )
-    if response.status_code == 200:
+    for product_name in product_names:
+        logger.info(f"Trying Generating Category with name: {product_name}")
+        response = requests.get("https://api.mercadolibre.com/sites/MLA/domain_discovery/search", 
+            params={"q": product_name, "limit": 6}, 
+            headers={"Authorization": f"Bearer {token}"}
+        )
         value = unidecode(json.dumps(response.json(), ensure_ascii=False).replace("'","").replace("\\n",""))
+        if value:
+            break
+
+    if response.status_code == 200:
         data = {
             'item_id': {'value': item_id, 'type': 'char'},
             'category_options': {'value': value , 'type': 'json'},
@@ -236,7 +243,6 @@ def _generate_category_options(item_id, product_name, token):
         update_method(data, SCHEMA_MERCADOLIBRE, ATTRIBUTES_TABLE)
     else:
         logger.error(f"Failed to create Category Options {response.text}")
-    
     return
 
 
@@ -379,7 +385,7 @@ def prepublish_product(item_id, token):
     logger.info("Running Pre-Publish Action on Mercadolibre")
     
     item_data = get_data_for_meli(item_id)
-    product_name = item_data["product_name_meli"] or item_data["product_name"]
+    product_names = [item_data["product_name_meli"], item_data["product_name"]]
     price = item_data["price_mercadolibre"] or item_data["price"]
     category_options = item_data['category_options']
     category_id = item_data['category_id']
@@ -388,8 +394,9 @@ def prepublish_product(item_id, token):
         settings = json.loads(settings)
         settings_error_check = [i for i in settings][0].get('Error', False)
 
-    if category_options is None:
-        _generate_category_options(item_id, product_name, token)
+    logger.info(category_options)
+    if category_options is None or category_options=='[]':
+        _generate_category_options(item_id, product_names, token)
 
     elif category_id is not None and (settings is None or settings_error_check):
         _settings_builder(item_id, category_id, price, token)
