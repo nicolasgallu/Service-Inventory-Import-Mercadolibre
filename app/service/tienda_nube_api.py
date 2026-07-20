@@ -32,7 +32,6 @@ def get_data_for_tnube(item_id):
             'a.brand',
             'a.dimentions',
             'a.price_tienda_nube',
-            'a.product_category',
             'b.id as attribute_id',
             'b.seo_title',
             'b.seo_description',

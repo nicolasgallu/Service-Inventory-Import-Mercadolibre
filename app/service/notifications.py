@@ -14,8 +14,4 @@ def enviar_mensaje_whapi(token, telefono, mensaje):
     }
     response = requests.post(url, json=payload, headers=headers)
     if response.status_code == 200:
-        logger.info(f"Whapi Response was sent.")
-
-    
-
-    
+        logger.info("Whapi Response was sent.")
