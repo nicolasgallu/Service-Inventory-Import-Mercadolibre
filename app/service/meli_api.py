@@ -12,6 +12,7 @@ from app.settings.config import TOKEN_WHAPI, PHONE_INTERNAL, SCHEMA_INVENTORY, S
 ATTRIBUTES_TABLE = 'attributes'
 PRODUCTS_TABLE = 'product_catalog_sync'
 COSTS_TABLE = 'selling_calculation'
+PROD_STATUS_TABLE= 'product_status'
 
 def ai_error_handling(api_response, user_message, item_id):
     logger.info("Improving Error message with AI and updating DB for Customer Visibility.")
@@ -61,10 +62,12 @@ def get_data_for_meli(item_id):
             'b.currency_id',
             'b.buying_mode',
             'b.condition_type',
-            'b.settings'
+            'b.settings',
+            'c.variants'
         ],
         'q_from':f'FROM {SCHEMA_INVENTORY}.{PRODUCTS_TABLE} as a',
-        'q_join':[f'LEFT JOIN {SCHEMA_MERCADOLIBRE}.{ATTRIBUTES_TABLE} as b on b.item_id = a.id'],
+        'q_join':[f'LEFT JOIN {SCHEMA_MERCADOLIBRE}.{ATTRIBUTES_TABLE} as b on b.item_id = a.id',
+                  f'LEFT JOIN {SCHEMA_MERCADOLIBRE}.{PROD_STATUS_TABLE} as c on c.meli_id = a.meli_id'],
         'q_where': f'WHERE a.id = {item_id}',
         'q_limit':'LIMIT 1'
     }
@@ -213,8 +216,6 @@ def _aux_product_format(item_data):
             
             elif setting == 'listing':
                 item_format['listing_type_id'] = [v.get('user_input_value') for v in setting_dict[setting]][0]
-
-    logger.info(item_format)           
     
     return item_format
 
@@ -484,6 +485,8 @@ def update_item(item_id, token):
     logger.info("Running Update Action on Mercadolibre")
     item_data = get_data_for_meli(item_id)
     meli_id = item_data['meli_id']
+    variants = json.loads(item_data['variants'])
+
     if meli_id is None or meli_id == '':
         logger.error(f"Item: {item_data['id']} is not published, nothing to update.")
         return
@@ -542,6 +545,10 @@ def update_item(item_id, token):
                     ai_error_handling(response, user_message, item_id)
     
         def _aux_update_item():
+            if variants.get('variations'):
+                logger.info("The Product has variations")
+                item_format = {'variations': variants['variations']}
+
             response = requests.put(url=url, json=item_format, headers=headers)
             if response.status_code < 300:
                 logger.info("General Update Done.")
