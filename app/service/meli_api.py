@@ -486,6 +486,8 @@ def update_item(item_id, token):
     item_data = get_data_for_meli(item_id)
     meli_id = item_data['meli_id']
     variants = json.loads(item_data['variants'])
+    if type(variants) == str:
+        variants = {}
 
     if meli_id is None or meli_id == '':
         logger.error(f"Item: {item_data['id']} is not published, nothing to update.")
@@ -504,64 +506,71 @@ def update_item(item_id, token):
             sub_status = next(iter(response.get('sub_status') or []), 'good')
             logger.info(f"Status output: {status} : {sub_status}")
             return status, sub_status, sold_quantity
+        
+    def _aux_update_listing():
+        data = {"id": listing_type_id}
+        response = requests.put(f"{url}/listing_type", data=data, headers=headers)
+        if response.status_code < 300:
+            logger.info("Listing Type Update Done.")
+
+    def _aux_reactivate_item():
+        """If item is paused, then try to reactive, else do nothing."""
+        if status == 'paused':
+            logger.info(f"Item {meli_id} is PAUSED. Attempting to re-activate...")
+            data = {"status": "active"}
+            response = requests.put(url=url, headers=headers, json=data)
+            if response.status_code < 300:
+                logger.info("Reactivate Done.")
+            else:
+                user_message = f"Error while reactivating product: {meli_id}"
+                ai_error_handling(response, user_message, item_id)
+
+
+
 
     status, sub_status, sold_quantity = _item_status()
     if status == 'under_review' and sub_status == 'forbidden':
         logger.info(f"Product in Forbidden status: {meli_id}, we are gonna delete and publish again.")
         delete_item(item_data, token)
         publish_item(item_data, token)
+        return
     
     else:
+        logger.info("Formatting item data for update..")
         item_format = _aux_product_format(item_data)
+        
 
         listing_type_id = item_format.get('listing_type_id')
         del item_format['category_id']
         del item_format['currency_id']
         del item_format['condition']
         del item_format['attributes']
-        del item_format['buying_mode']        
+        del item_format['buying_mode']
         del item_format['shipping']
         del item_format['listing_type_id']
 
         if sold_quantity > 0:
             del item_format["title"]
 
-        def _aux_update_listing():
-            data = {"id": listing_type_id}
-            response = requests.put(f"{url}/listing_type", data=data, headers=headers)
-            if response.status_code < 300:
-                logger.info("Listing Type Update Done.")
-
-        def _aux_reactivate_item():
-            """If item is paused, then try to reactive, else do nothing."""
-            if status == 'paused':
-                logger.info(f"Item {meli_id} is PAUSED. Attempting to re-activate...")
-                data = {"status": "active"}
-                response = requests.put(url=url, headers=headers, json=data)
-                if response.status_code < 300:
-                    logger.info("Reactivate Done.")
-                else:
-                    user_message = f"Error while reactivating product: {meli_id}"
-                    ai_error_handling(response, user_message, item_id)
-    
-        def _aux_update_item():
-            if variants.get('variations'):
-                logger.info("The Product has variations")
-                item_format = {'variations': variants['variations']}
-
-            response = requests.put(url=url, json=item_format, headers=headers)
-            if response.status_code < 300:
-                logger.info("General Update Done.")
-                _set_description(meli_id, item_data['description'], token, update=True)
-                _aux_update_listing()
-                _aux_reactivate_item()
-            else:
-                user_message = f"Error while updating product: {meli_id}"
-                logger.info(response.json())
-                ai_error_handling(response, user_message, item_id)
+    def _aux_update_item():
+        nonlocal item_format
         
-        _aux_update_item()
+        if variants.get('variations'):
+            logger.info("The Product has variations")
+            item_format = {'variations': variants['variations']}
+        response = requests.put(url=url, json=item_format, headers=headers)
+        if response.status_code < 300:
+            logger.info("General Update Done.")
+            _set_description(meli_id, item_data['description'], token, update=True)
+            _aux_update_listing()
+            _aux_reactivate_item()
+        else:
+            user_message = f"Error while updating product: {meli_id}"
+            logger.info(response.json())
+            ai_error_handling(response, user_message, item_id)
 
+
+    _aux_update_item()
     return
 
  
