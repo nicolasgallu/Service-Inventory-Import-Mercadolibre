@@ -232,7 +232,8 @@ def tienda_nube_update_item(item_id):
         }
 
     if product_id is None:
-        db_data['response']['value'] = f"Failed to update: {json.dumps({"message":"Producto no se encuentra publicado."})}"
+        error = {"message": "Producto no se encuentra publicado."}
+        db_data['response']['value'] = f"Failed to update: {json.dumps(error)}"
         db_data['updated_at']['value'] = datetime.now()
         upsert_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
         return
