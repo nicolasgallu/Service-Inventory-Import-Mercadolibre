@@ -231,6 +231,12 @@ def tienda_nube_update_item(item_id):
             'updated_at':{'value':None, 'type':'datetime'},
         }
 
+    if product_id is None:
+        db_data['response']['value'] = f"Failed to update: {json.dumps({"message":"Producto no se encuentra publicado."})}"
+        db_data['updated_at']['value'] = datetime.now()
+        upsert_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
+        return
+
     images = product_data.pop('images')
     url_upd_product = f"{url_base}/{product_id}"
     url_upd_variant = f"{url_upd_product}/variants/{variant_id}"
@@ -244,46 +250,45 @@ def tienda_nube_update_item(item_id):
         logger.error("product failed to update")
         db_data['response']['value'] = f"Failed to update: {json.dumps(response.json(), ensure_ascii=False)}"
         db_data['updated_at']['value'] = datetime.now()
-        update_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
+        upsert_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
         return
 
-    #logger.info("Step 2: Upadting Product (variant)")
-    #response = requests.put(url_upd_variant, headers=headers, data=json.dumps(variant_data[0]))
-    #if response.status_code == 200:
-    #    logger.info("Step 2: Done")
-    #else:
-    #    logger.error("variant failed to update")
-    #    db_data['response']['value'] = f"Failed to update: {json.dumps(response.json(), ensure_ascii=False)}"
-    #    db_data['updated_at']['value'] = datetime.now()
-    #    update_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
-    #    return
-#
-    #logger.info("Step 3: Upadting Product (images)")
-    #response = requests.get(url_upd_image, headers=headers)
-    #product_images = response.json()
-    #for p_image in product_images:
-    #    id = p_image['id']
-    #    response = requests.delete(f"{url_upd_image}/{id}", headers=headers)
-    #    if response.status_code == 200:
-    #        logger.info("image deleted correctly")
-    #    else:
-    #        logger.info(f"error deleting image {id}")
-#
-    #for image in images:
-    #    response = requests.post(url_upd_image, headers=headers, data=json.dumps(image))
-    #    if response.status_code == 201:
-    #        logger.info("image correctly loaded")
-    #        continue
-    #    else:
-    #        logger.error("images failed to update")
-    #        logger.info(str(response.json()))
-    #        continue
-    #
-    #logger.info("Step 3: Done")
-    #db_data['response']['value'] = 'producto correctamente actualizado'
-    #db_data['updated_at']['value'] = datetime.now()
-    #update_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
-    #return
+    logger.info("Step 2: Upadting Product (variant)")
+    response = requests.put(url_upd_variant, headers=headers, data=json.dumps(variant_data[0]))
+    if response.status_code == 200:
+        logger.info("Step 2: Done")
+    else:
+        logger.error("variant failed to update")
+        db_data['response']['value'] = f"Failed to update: {json.dumps(response.json(), ensure_ascii=False)}"
+        db_data['updated_at']['value'] = datetime.now()
+        upsert_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
+        return
+
+    logger.info("Step 3: Upadting Product (images)")
+    response = requests.get(url_upd_image, headers=headers)
+    product_images = response.json()
+    for p_image in product_images:
+        id = p_image['id']
+        response = requests.delete(f"{url_upd_image}/{id}", headers=headers)
+        if response.status_code == 200:
+            logger.info("image deleted correctly")
+        else:
+            logger.info(f"error deleting image {id}")
+
+    for image in images:
+        response = requests.post(url_upd_image, headers=headers, data=json.dumps(image))
+        if response.status_code == 201:
+            logger.info("image correctly loaded")
+            continue
+        else:
+            logger.error("images failed to update")
+            logger.info(str(response.json()))
+            continue
+    
+    logger.info("Step 3: Done")
+    db_data['response']['value'] = 'producto correctamente actualizado'
+    db_data['updated_at']['value'] = datetime.now()
+    upsert_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
     return
 
 ###==========================DELETE=================================##
