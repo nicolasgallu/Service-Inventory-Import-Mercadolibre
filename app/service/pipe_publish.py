@@ -48,5 +48,5 @@ def pipeline_publish(response):
         return
     
     except Exception:
-        logger.exception(Exception)
-        raise
+        logger.exception("pipeline_publish failed")
+        return

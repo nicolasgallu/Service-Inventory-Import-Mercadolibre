@@ -395,7 +395,6 @@ def prepublish_product(item_id, token):
         settings = json.loads(settings)
         settings_error_check = [i for i in settings][0].get('Error', False)
 
-    logger.info(category_options)
     if category_options is None or category_options=='[]':
         _generate_category_options(item_id, product_names, token)
 

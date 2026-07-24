@@ -7,7 +7,7 @@ from app.settings.config import DS_API_KEY, TOKEN_WHAPI, PHONE_INTERNAL
 def call_deepseek_api(sys_prompt, user_prompt):
     
     payload = {
-        "model": "deepseek-chat",
+        "model": "deepseek-v4-flash",
         "messages": [
                 {"role": "system", "content": json.dumps(sys_prompt)},
                 {"role": "user", "content": json.dumps(user_prompt)}
@@ -28,8 +28,7 @@ def call_deepseek_api(sys_prompt, user_prompt):
         return ai_response
     
     except:
-        response = response.json()
-        logger.info(f"Failed to call DeepSeek AI.. {response}")
-        enviar_mensaje_whapi(TOKEN_WHAPI, PHONE_INTERNAL, response)
+        logger.info("Failed to call DeepSeek AI.")
+        enviar_mensaje_whapi(TOKEN_WHAPI, PHONE_INTERNAL, "Failed to call DeepSeek AI.")
         raise
     
