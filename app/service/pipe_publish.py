@@ -50,4 +50,3 @@ def pipeline_publish(response):
     except Exception:
         logger.exception(Exception)
         raise
-                
