@@ -13,4 +13,8 @@ def calculating_cost(response):
         _generate_category_options(item_id, item_data.get('product_name'), token)
         return
 
+    if item_data.get('settings') == None:
+        logger.warning("Settings is Empty, failed to run cost calulcation.")
+        return
+
     calculate_cost(item_data, user_id, token)
