@@ -178,10 +178,12 @@ def aux_format_data(item_id):
 def _aux_generate_url(product_id):
     """"""
     url_base, headers = aux_base_products_url()
-    response = requests.get(f"{url_base}/{product_id}", headers=headers)
-    response.raise_for_status()
-    product = response.json()
-    return product["canonical_url"]
+    try :
+        response = requests.get(f"{url_base}/{product_id}", headers=headers)
+        product = response.json()
+        return product["canonical_url"]
+    except:
+        return "Failed to get URL from product"
 
 def tienda_nube_publish_item(item_id):
     
