@@ -311,6 +311,7 @@ def tienda_nube_delete_item(item_id):
         db_data['attribute_id']['value'] = attribute_id
         db_data['product_id'] = {'value': None, 'type':'signed'}
         db_data['variant_id'] = {'value': None, 'type':'signed'}
+        db_data['url'] = {'value': None, 'type':'char'}
         db_data['response']['value'] = 'producto correctamente eliminado'
         db_data['updated_at']['value'] = datetime.now()
         update_method(db_data, SCHEMA_TNUBE, PRODUCT_STATUS_TABLE)
