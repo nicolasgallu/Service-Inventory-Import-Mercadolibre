@@ -22,7 +22,7 @@ def _aux_get_ai_prompt():
     return prompt
 
 
-def ai_call_prepublish(data, item_id):
+def ai_call_prepublish(user_prompt, item_id):
     """generates description, title, brand and model."""
     
     item_data = get_data_for_meli(item_id)
@@ -34,6 +34,31 @@ def ai_call_prepublish(data, item_id):
 
     prompts = _aux_get_ai_prompt()
     data = {'id': {'value': item_id, 'type': 'char'}}
+
+    if user_prompt.get('prompt') and user_prompt.get('field'):
+        logger.info("Received a user prompt action")
+        prompt = user_prompt.get('prompt')
+        column = None
+        if not prompt:
+            return
+        
+        if user_prompt.get('field') == 'product_name_meli':
+            currentvalue = product_name_meli or original_title
+            column = 'product_name_meli'
+        else:
+            currentvalue = description
+            column = 'description'
+
+        sys_prompt = f"""corregi este dato que te voy a dar segun mi prompt. 
+        (OBLIGATORIO: devolve solo el resultado mejorado, sin comments ni nada extra).
+        dato a corregir: {currentvalue}"""
+        ai_response = call_deepseek_api(sys_prompt, prompt)
+        data[column]={'value': ai_response, 'type': 'char'}
+        update_method(data, SCHEMA_INVENTORY, PRODUCTS_TABLE)
+        return
+
+
+
 
     if not product_name_meli:
         logger.info("AI Automatic - Creating Product Name Improved.")

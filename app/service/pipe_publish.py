@@ -12,8 +12,8 @@ def pipeline_publish(response):
         event_type = response.get('event_type')
         if event_type == 'pre-publish':
             logger.info("Pre-Publish Notification.")
-            data = response.get('data')
-            ai_call_prepublish(data, item_id)
+            user_prompt = response.get('data')
+            ai_call_prepublish(user_prompt, item_id)
             token = meli_secrets()
             prepublish_product(item_id, token)
 
