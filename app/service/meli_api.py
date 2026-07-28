@@ -530,8 +530,8 @@ def update_item(item_id, token):
     status, sub_status, sold_quantity = _item_status()
     if status == 'under_review' and sub_status == 'forbidden':
         logger.info(f"Product in Forbidden status: {meli_id}, we are gonna delete and publish again.")
-        delete_item(item_data, token)
-        publish_item(item_data, token)
+        delete_item(item_id, token)
+        publish_item(item_id, token)
         return
     
     else:
@@ -607,7 +607,7 @@ def delete_item(item_id, token):
 
     logger.info("Running Delete Action on Mercadolibre")
     item_data = get_data_for_meli(item_id)
-    meli_id = item_data['meli_id'] 
+    meli_id = item_data['meli_id']
 
     if meli_id is None:
         logger.error(f"Product: {item_id} is not published, nothing to delete.")
