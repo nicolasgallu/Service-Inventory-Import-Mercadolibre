@@ -35,27 +35,28 @@ def ai_call_prepublish(user_prompt, item_id):
     prompts = _aux_get_ai_prompt()
     data = {'id': {'value': item_id, 'type': 'char'}}
 
-    if user_prompt.get('prompt') and user_prompt.get('field'):
-        logger.info("Received a user prompt action")
-        prompt = user_prompt.get('prompt')
-        column = None
-        if not prompt:
+    if user_prompt:
+        if user_prompt.get('prompt') and user_prompt.get('field'):
+            logger.info("Received a user prompt action")
+            prompt = user_prompt.get('prompt')
+            column = None
+            if not prompt:
+                return
+            
+            if user_prompt.get('field') == 'product_name_meli':
+                currentvalue = product_name_meli or original_title
+                column = 'product_name_meli'
+            else:
+                currentvalue = description
+                column = 'description'
+    
+            sys_prompt = f"""corregi este dato que te voy a dar segun mi prompt. 
+            (OBLIGATORIO: devolve solo el resultado mejorado, sin comments ni nada extra).
+            dato a corregir: {currentvalue}"""
+            ai_response = call_deepseek_api(sys_prompt, prompt)
+            data[column]={'value': ai_response, 'type': 'char'}
+            update_method(data, SCHEMA_INVENTORY, PRODUCTS_TABLE)
             return
-        
-        if user_prompt.get('field') == 'product_name_meli':
-            currentvalue = product_name_meli or original_title
-            column = 'product_name_meli'
-        else:
-            currentvalue = description
-            column = 'description'
-
-        sys_prompt = f"""corregi este dato que te voy a dar segun mi prompt. 
-        (OBLIGATORIO: devolve solo el resultado mejorado, sin comments ni nada extra).
-        dato a corregir: {currentvalue}"""
-        ai_response = call_deepseek_api(sys_prompt, prompt)
-        data[column]={'value': ai_response, 'type': 'char'}
-        update_method(data, SCHEMA_INVENTORY, PRODUCTS_TABLE)
-        return
 
 
 
