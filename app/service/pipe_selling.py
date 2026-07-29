@@ -3,13 +3,11 @@ from app.service.secrets import meli_secrets, tienda_nube_secrets
 from app.service.database import get_order, insert_order, get_method, get_tienda_nube_id
 from app.service.post_bitcram import sell_workflow
 from app.service.notifications import enviar_mensaje_whapi
-from app.settings.config import PHONE_INTERNAL, PHONE_CUSTOMER, TOKEN_WHAPI, SCHEMA_INVENTORY, SCHEMA_MERCADOLIBRE
+from app.settings.config import PHONE_INTERNAL, PHONE_CUSTOMER, TOKEN_WHAPI, SCHEMA_INVENTORY
 import requests
 import json
 
 PRODUCTS_TABLE = 'product_catalog_sync'
-PROD_STATUS_TABLE= 'product_status'
-
 
 def pipeline_selling(order_id, platform):
     """"""
@@ -42,19 +40,34 @@ def pipeline_selling(order_id, platform):
                 
                 for item_info in order_items:
                     meli_id = item_info.get('item', {}).get('id')
-                    json_filter = json.dumps({"id": meli_id})
+
+                    url = f"https://api.mercadolibre.com/items/{meli_id}?include_attributes=all"
+                    headers = {
+                        "Authorization": f"Bearer {token}"
+                    }
+                    response = requests.get(url, headers=headers).json()
+                    sku = response.get("seller_sku")
+                    gtin = None
+                    for attr in response.get("attributes", []):
+                        if attr.get("id") == "GTIN":
+                            gtin = attr.get("value_name")
+                            break
+                    product_code = gtin or sku
+   
                     query = {
                         'q_columns': [
                             'a.meli_id',
-                            'b.id'
                         ],
-                        'q_from':f'FROM {SCHEMA_MERCADOLIBRE}.{PROD_STATUS_TABLE} as a',
-                        'q_join':[f'JOIN {SCHEMA_INVENTORY}.{PRODUCTS_TABLE} as b on a.meli_id = b.meli_id'],
-                        'q_where': f"""WHERE JSON_CONTAINS(a.listing_catalog, '{json_filter}' ) or a.meli_id = '{meli_id}'""",
+                        'q_from':f'FROM {SCHEMA_INVENTORY}.{PRODUCTS_TABLE} as a',
+                        'q_where': f"WHERE a.meli_id = '{meli_id}'",
                         'q_limit':'LIMIT 1'
                     }
-
                     data = get_method(query)
+                    if data is None:
+                        logger.info("The Meli id is not in our db, searching by product code..")
+                        query['q_where'] = f"WHERE a.product_code = '{product_code}'"
+                        data = get_method(query)
+
                     logger.info(data)
                     quantity = item_info.get('quantity')
                     unit_price = item_info.get('unit_price')
