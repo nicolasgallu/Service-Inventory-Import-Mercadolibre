@@ -56,7 +56,8 @@ def pipeline_selling(order_id, platform):
    
                     query = {
                         'q_columns': [
-                            'a.meli_id',
+                            'a.id',
+                            'a.meli_id'
                         ],
                         'q_from':f'FROM {SCHEMA_INVENTORY}.{PRODUCTS_TABLE} as a',
                         'q_where': f"WHERE a.meli_id = '{meli_id}'",
