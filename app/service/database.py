@@ -102,69 +102,6 @@ def insert_order(order, platform):
         logger.info("Load Completed.")
 
 
-def get_bitcram_data(meli_id):
-    """"""
-    with engine.begin() as conn:
-        logger.info(f"Extracting data from Meli_ID: {meli_id}.")
-        result = conn.execute(
-            text(f"""
-                    with 
-                    first_match  as (
-                    select 
-                      a.meli_id,
-                      a.id,
-                      a.cost,
-                      1 as aux_priority 
-                      from {SCHEMA_INVENTORY}.product_catalog_sync as a
-                      where a.meli_id = '{meli_id}'
-                      limit 1
-                      ),
-                    
-                    second_match as (
-                    
-                      select 
-                      a.meli_id,
-                      b.id,
-                      b.cost,
-                      2 as aux_priority 
-                      from mercadolibre.catalog_listing as a
-                      left join {SCHEMA_INVENTORY}.product_catalog_sync as b on a.meli_id = b.meli_id
-                      where a.catalog_product_id in (
-                        select catalog_product_id 
-                        from mercadolibre.catalog_listing 
-                        where meli_id = '{meli_id}') and b.id is not null
-                        limit 1
-                    ),
-                    
-                    final as (
-                      select * from first_match
-                      union all
-                      select * from second_match),
-                    
-                    ranked_results as (
-                      select 
-                        *,
-                        row_number() over(partition by meli_id order by aux_priority asc) as rn
-                      from final
-                    )
-                    
-                    select
-                    id,
-                    cost
-                    from ranked_results 
-                    where rn = 1
-            """)
-        )
-        data = [dict(row) for row in result.mappings()][0]
-        if data:
-            logger.info("Data extraction completed.")
-            return data
-        else:
-            logger.info("Data extraction failed.")
-            return None
-
-
-
 def get_method(data):
     """returns a single row of a get sql"""
     with engine.begin() as conn:

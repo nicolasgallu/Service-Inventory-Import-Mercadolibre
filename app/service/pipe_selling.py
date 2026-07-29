@@ -1,11 +1,15 @@
 from app.utils.logger import logger
 from app.service.secrets import meli_secrets, tienda_nube_secrets
-from app.service.database import get_order, insert_order, get_bitcram_data, get_tienda_nube_id
+from app.service.database import get_order, insert_order, get_method, get_tienda_nube_id
 from app.service.post_bitcram import sell_workflow
 from app.service.notifications import enviar_mensaje_whapi
-from app.settings.config import PHONE_INTERNAL, PHONE_CUSTOMER, TOKEN_WHAPI
+from app.settings.config import PHONE_INTERNAL, PHONE_CUSTOMER, TOKEN_WHAPI, SCHEMA_INVENTORY, SCHEMA_MERCADOLIBRE
 import requests
 import json
+
+PRODUCTS_TABLE = 'product_catalog_sync'
+PROD_STATUS_TABLE= 'product_status'
+
 
 def pipeline_selling(order_id, platform):
     """"""
@@ -38,9 +42,22 @@ def pipeline_selling(order_id, platform):
                 
                 for item_info in order_items:
                     meli_id = item_info.get('item', {}).get('id')
+                    json_filter = json.dumps({"id": meli_id})
+                    query = {
+                        'q_columns': [
+                            'a.meli_id',
+                            'b.id'
+                        ],
+                        'q_from':f'FROM {SCHEMA_MERCADOLIBRE}.{PROD_STATUS_TABLE} as a',
+                        'q_join':[f'JOIN {SCHEMA_INVENTORY}.{PRODUCTS_TABLE} as b on a.meli_id = b.meli_id'],
+                        'q_where': f"""WHERE JSON_CONTAINS(a.listing_catalog, '{json_filter}' ) or a.meli_id = '{meli_id}'""",
+                        'q_limit':'LIMIT 1'
+                    }
+
+                    data = get_method(query)
+                    logger.info(data)
                     quantity = item_info.get('quantity')
                     unit_price = item_info.get('unit_price')
-                    data = get_bitcram_data(meli_id)
                     id = data.get('id')
                     sell_workflow(order_id, id, quantity, unit_price)
 
