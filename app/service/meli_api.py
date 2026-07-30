@@ -484,9 +484,7 @@ def update_item(item_id, token):
     logger.info("Running Update Action on Mercadolibre")
     item_data = get_data_for_meli(item_id)
     meli_id = item_data['meli_id']
-    variants = json.loads(item_data['variants'])
-    if type(variants) == str:
-        variants = {}
+    variants = json.loads(item_data['variants'] or "{}")
 
     if meli_id is None or meli_id == '':
         logger.error(f"Item: {item_data['id']} is not published, nothing to update.")

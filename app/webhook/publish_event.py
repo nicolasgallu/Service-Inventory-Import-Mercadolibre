@@ -23,13 +23,13 @@ def main():
         return jsonify({"status": "not accepted"}), 400
     
     id = response.get('item_id')
-    logger.info(f"evento recibido para item: {id}")
+    logger.info(f"event received for item: {id}")
     with memory_lock:
         if id in memory:
             logger.warning(f"Skipped event for item: {id}")
             return jsonify({"status": "skipping"}), 201
     
-    logger.warning(f"Processing event for item: {id}")
+    logger.info(f"Adding event in memory for item: {id}")
     memory.add(id)
     thread = threading.Thread(target=run_pipe_publish, args=[response])
     thread.start()
