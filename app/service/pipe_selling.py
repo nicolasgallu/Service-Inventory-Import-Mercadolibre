@@ -1,13 +1,20 @@
 from app.utils.logger import logger
 from app.service.secrets import meli_secrets, tienda_nube_secrets
-from app.service.database import get_order, insert_order, get_method, get_tienda_nube_id
+from app.service.database import get_order, insert_order, get_method, get_tienda_nube_id, upsert_method
 from app.service.post_bitcram import sell_workflow
 from app.service.notifications import enviar_mensaje_whapi
-from app.settings.config import PHONE_INTERNAL, PHONE_CUSTOMER, TOKEN_WHAPI, SCHEMA_INVENTORY
+from app.settings.config import (
+    PHONE_INTERNAL, 
+    PHONE_CUSTOMER, 
+    TOKEN_WHAPI, 
+    SCHEMA_INVENTORY, 
+    SCHEMA_MERCADOLIBRE
+)
 import requests
 import json
 
 PRODUCTS_TABLE = 'product_catalog_sync'
+ORDERS_TABLE_MELI = 'orders'
 
 def pipeline_selling(order_id, platform):
     """"""
@@ -34,9 +41,14 @@ def pipeline_selling(order_id, platform):
                 order_id = order_data.get('id')
                 created_at = order_data.get('date_created')
                 order_items = order_data.get('order_items', [])
-                order = {'id':order_id,'data': json.dumps(order_items) ,'created_at': created_at}
+                pack_id = order_data.get('pack_id', None)
+                order = {'id':{'value': order_id, 'type': 'char'},
+                         'data':  {'value': json.dumps(order_items), 'type': 'json'}, 
+                         'pack_id':{'value': pack_id, 'type': 'char'}, 
+                         'created_at': {'value': created_at, 'type': 'datetime'}
+                }
                 logger.info("Order Dict Created. saving order in DB.")
-                insert_order(order, platform)
+                upsert_method(order, SCHEMA_MERCADOLIBRE, ORDERS_TABLE_MELI)
                 
                 for item_info in order_items:
                     meli_id = item_info.get('item', {}).get('id')
