@@ -72,7 +72,7 @@ def get_data_for_meli(item_id):
         'q_limit':'LIMIT 1'
     }
     item_data = get_method(query)
-    return item_data
+    return item_data[0]
 
 
 def is_valid_gtin(gtin):

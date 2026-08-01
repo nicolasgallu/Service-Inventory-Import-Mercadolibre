@@ -58,7 +58,7 @@ def get_data_for_tnube(item_id):
         'q_limit':'LIMIT 1'
     }
     item_data = get_method(query)
-    return item_data
+    return item_data[0]
 
 
 def get_category(category_name):
@@ -70,7 +70,7 @@ def get_category(category_name):
         'q_limit':'LIMIT 1'
     }
     category_name = get_method(query)
-    return category_name
+    return category_name[0]
 
 
 def aux_base_products_url():
@@ -116,6 +116,7 @@ def aux_format_data(item_id):
     variant_id = data.get("variant_id", None)
 
     public_images = process_images_storage(item_id)
+    #public_images=[]
     if public_images == []:
         logger.info("Public Images in Drive not founded, using image from Bitcram..")
         public_images = [{'src': data["product_image_b_format_url"]}]

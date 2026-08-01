@@ -14,6 +14,7 @@ import requests
 import json
 
 PRODUCTS_TABLE = 'product_catalog_sync'
+PROD_STATUS_TABLE_MELI = 'product_status'
 ORDERS_TABLE_MELI = 'orders'
 
 def pipeline_selling(order_id, platform):
@@ -75,12 +76,37 @@ def pipeline_selling(order_id, platform):
                         'q_where': f"WHERE a.meli_id = '{meli_id}'",
                         'q_limit':'LIMIT 1'
                     }
+                    logger.info("Searching product by meli id")
                     data = get_method(query)
                     if data is None:
-                        logger.info("The Meli id is not in our db, searching by product code..")
+                        logger.info("Failed to search by Meli id")
+                        logger.info("Searching product by product code (sku/gtin)")
                         query['q_where'] = f"WHERE a.product_code = '{product_code}'"
                         data = get_method(query)
+                        if data is None:
+                            logger.info("Failed to search by product code")
+                            logger.info("Searching product by listing catalog")
+                            id_format = json.dumps([{"id": meli_id}])
+                            query = {
+                                'q_columns': [
+                                    'a.meli_id',
+                                    'a.listing_catalog',
+                                    'b.id'
+                                ],
+                                'q_from':f'FROM {SCHEMA_MERCADOLIBRE}.{PROD_STATUS_TABLE_MELI} as a',
+                                'q_join':[f'LEFT JOIN {SCHEMA_INVENTORY}.{PRODUCTS_TABLE} as b on b.meli_id = a.meli_id'],
+                                'q_where': f"WHERE json_contains(a.listing_catalog, '{id_format}')",
+                            }
+                            data = get_method(query)
+                            if data is None or len(data) > 1:
+                                logger.info("Failed to search by listting catalog")
+                                logger.info("The result was either None or returned more than one result.")
+                                message = f"""It was not possible to track succesfully the product sold inside our DB.\n 
+                                OrderID: {order_id}"""
+                                enviar_mensaje_whapi(TOKEN_WHAPI, PHONE_INTERNAL, message)
+                                return
 
+                    data = data[0]
                     logger.info(data)
                     quantity = item_info.get('quantity')
                     unit_price = item_info.get('unit_price')

@@ -125,7 +125,7 @@ def get_method(data):
         data = [dict(row) for row in result.mappings()]
         if data:
             logger.info("Data extraction completed.")
-            return data[0]
+            return data
         else:
             logger.info("Data extraction failed.")
             return None

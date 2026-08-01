@@ -19,7 +19,7 @@ def _aux_get_ai_prompt():
         'q_limit':'LIMIT 1'
     }
     prompt = get_method(query)
-    return prompt
+    return prompt[0]
 
 
 def ai_call_prepublish(user_prompt, item_id):
