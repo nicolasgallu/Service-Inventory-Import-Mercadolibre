@@ -142,7 +142,7 @@ def _aux_product_format(item_data):
     }
     
     item_format = {
-        "title": product_name,
+        "family_name": product_name,
         "category_id": item_data['category_id'], 
         "price": str(price), 
         "currency_id": 'ARS', 
