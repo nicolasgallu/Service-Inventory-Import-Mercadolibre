@@ -547,7 +547,7 @@ def update_item(item_id, token):
         del item_format['listing_type_id']
 
         if sold_quantity > 0:
-            del item_format["title"]
+            del item_format["family_name"]
 
     def _aux_update_item():
         nonlocal item_format
