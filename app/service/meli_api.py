@@ -548,6 +548,16 @@ def update_item(item_id, token):
 
         if sold_quantity > 0:
             del item_format["family_name"]
+        else:
+            logger.info("Updating Family Name.")
+            payload = {"family_name": item_format["family_name"]}
+            response = requests.put(url=url+'/family_name', json=payload, headers=headers)
+            if response.status_code < 300:
+                logger.info("Updating Family Name Done.")
+            else:
+                logger.error(response)
+            del item_format["family_name"]
+
 
     def _aux_update_item():
         nonlocal item_format
