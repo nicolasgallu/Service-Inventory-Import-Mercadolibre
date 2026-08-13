@@ -1,5 +1,6 @@
 from app.service.secrets import meli_secrets
 from app.service.ai_completation import ai_call_prepublish
+from app.service.meli_grid_api import create_template, create_grid
 from app.service.meli_api import prepublish_product, publish_item, update_item, pause_item, delete_item
 from app.service.tienda_nube_api import create_categories, tienda_nube_publish_item, tienda_nube_update_item, tienda_nube_delete_item
 from app.utils.logger import logger
@@ -45,8 +46,12 @@ def pipeline_publish(response):
                 pause_item(item_id, token)
             elif event_type == "delete":
                 delete_item(item_id, token)
+            elif event_type == "create_template":
+                create_template(item_id)
+            elif event_type == "create_size_grid":
+                create_grid(item_id)
         return
     
     except Exception:
-        logger.exception("pipeline_publish failed")
+        logger.exception(f"pipeline_publish failed with item_id: {item_id}")
         return

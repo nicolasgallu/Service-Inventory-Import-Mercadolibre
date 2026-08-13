@@ -356,7 +356,7 @@ def _settings_builder(item_id, category_id, price, token):
                 if setting == 'attributes':
                     bool_att_req = i.get('tags').get('required', i.get('tags').get('conditional_required'))
 
-                if (bool_att_req == True and id not in INTERNAL_AVOID_REQMNT) or (
+                if (bool_att_req == True and id not in INTERNAL_AVOID_REQMNT) or id in ["SIZE_GRID_ID", "SIZE_GRID_ROW_ID"] or (
                     setting == 'sale_terms' and id in ['WARRANTY_TYPE', 'WARRANTY_TIME']) or (
                     setting == 'listing' or setting == 'shipping'
                     ): 
