@@ -37,7 +37,7 @@ def pipeline_selling(order_id, platform):
             if response.status_code < 300:
                 logger.info("Order Information correctly pulled from Mercadolibre")
                 order_data = response.json()
-                order_in_db = get_method(query_meli)[0]
+                order_in_db = get_method(query_meli)[0] if get_method(query_meli) else {}
                 DEVOLUTION_MULTIPLIER = 1
                 IS_NEW_ORDER = True
 
