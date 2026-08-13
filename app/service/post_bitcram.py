@@ -1,10 +1,9 @@
 import requests
 import json
 from app.utils.logger import logger
-from app.settings.config import BASE_URL, CHECKOUT_NUMBER, PHONE_INTERNAL, TOKEN_WHAPI
+from app.settings.config import CHECKOUT_NUMBER, BASE_URL, PHONE_INTERNAL, TOKEN_WHAPI
 from app.service.notifications import enviar_mensaje_whapi
 from app.service.secrets import bitcram_secrets
-
 
 def sell_workflow(order_id, target_product_id, quantity, price):
 
@@ -66,6 +65,7 @@ def create_commercial_doc(target_product_id, quantity, price, headers):
             })
         }
     )
+  
     if response.raise_for_status() is None: 
         response = response.json()  
         checkout_items = response.get("items", [])
@@ -81,7 +81,6 @@ def create_commercial_doc(target_product_id, quantity, price, headers):
             logger.info(f"La caja número {CHECKOUT_NUMBER} está cerrada !!!")
             return "ERROR"
 
-        
         payment_type_id = get_payment_id(checkout_session_id, headers)
         
 

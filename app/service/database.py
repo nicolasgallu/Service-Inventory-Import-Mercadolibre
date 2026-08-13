@@ -127,7 +127,7 @@ def get_method(data):
             logger.info("Data extraction completed.")
             return data
         else:
-            logger.info("Data extraction failed.")
+            logger.info("Data extraction is empty.")
             return None
 
 

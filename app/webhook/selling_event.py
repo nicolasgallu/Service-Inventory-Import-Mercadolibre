@@ -28,7 +28,7 @@ def main():
             'order_id': data.get('id')
         }
     else:
-        logger.info("Sell Webhook: Event Rejected [not a sell]")
+        logger.info("Sell Webhook: Event Rejected [not an order]")
         return jsonify({"status": "ignores", "message": "event rejected"}), 200
 
     order_id = data.get('order_id')
@@ -37,7 +37,7 @@ def main():
         memory.add(order_id)
         thread = threading.Thread(target=run_pipe_selling, args=(order_id, platform))
         thread.start()
-        logger.info("Sell Webhook: Event Accepted [new order]")
+        logger.info("Sell Webhook: Event Accepted")
         return jsonify({"status": "accepted", "message": "event received"}), 200
     else:
         logger.info("Sell Webhook: Event Rejected [already in pipeline]")

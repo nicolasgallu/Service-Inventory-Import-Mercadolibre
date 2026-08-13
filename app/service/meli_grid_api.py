@@ -12,17 +12,19 @@ PRODUCTS_TABLE = 'product_catalog_sync'
 ATTRIBUTES_TABLE = 'attributes'
 GRID_TABLE = 'size_grid'
 SITE_ID = "MLA"
-TOKEN = meli_secrets()
-HEADERS = {
-    "Authorization": f"Bearer {TOKEN}",
-    "Content-Type": "application/json"
-}
+
+def get_headers():
+    token = meli_secrets()
+    return {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
 
 
 def get_row_id(size_grid_id, size):
     grid = requests.get(
         f"https://api.mercadolibre.com/catalog/charts/{size_grid_id}",
-        headers=HEADERS
+        headers=get_headers()
     ).json()
 
     for row in grid.get("rows", []):
@@ -100,7 +102,7 @@ def request_tech_spec(BRAND, DOMAIN_ID, GENDER):
     """"""
     logger.info("Requesting technical specs")
     response = requests.get(f"https://api.mercadolibre.com/domains/{DOMAIN_ID}/technical_specs",
-                headers=HEADERS)
+                headers=get_headers())
     response.raise_for_status()
     data = response.json()
 
@@ -159,7 +161,7 @@ def create_template(item_id):
         for attr in required
     ]
 
-    response = requests.post(URL, headers=HEADERS, json={"attributes": attributes})
+    response = requests.post(URL, headers=get_headers(), json={"attributes": attributes})
     response_data = response.json()
 
     MEASURE_TYPES = {"BODY_MEASURE", "CLOTHING_MEASURE", "MIXED_MEASURE"}
@@ -286,7 +288,7 @@ def create_grid(item_id):
 
     response = requests.post(
         "https://api.mercadolibre.com/catalog/charts",
-        headers=HEADERS,
+        headers=get_headers(),
         json=body
     )
     try:
@@ -316,7 +318,7 @@ def create_grid(item_id):
             'settings': {'value': clean_json, 'type': 'JSON'},
         }
         upsert_method(new_settings, SCHEMA_MERCADOLIBRE, ATTRIBUTES_TABLE)
-        publish_item(item_id, TOKEN)
+        publish_item(item_id, meli_secrets())
   
     except requests.HTTPError:
         clean_json = unidecode(json.dumps(response.json(), 
