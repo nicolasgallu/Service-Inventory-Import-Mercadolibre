@@ -1,4 +1,5 @@
 from app.service.secrets import meli_secrets
+import asyncio
 from app.service.ai_completation import ai_call_prepublish
 from app.service.meli_grid_api import create_template, create_grid
 from app.service.meli_api import prepublish_product, publish_item, update_item, pause_item, delete_item
@@ -14,7 +15,7 @@ def pipeline_publish(response):
         if event_type == 'pre-publish':
             logger.info("Pre-Publish Notification.")
             user_prompt = response.get('data')
-            ai_call_prepublish(user_prompt, item_id)
+            asyncio.run(ai_call_prepublish(user_prompt, item_id))
             token = meli_secrets()
             prepublish_product(item_id, token)
 
