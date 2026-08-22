@@ -8,13 +8,14 @@ import google.auth
 from googleapiclient.discovery import build
 from app.utils.logger import logger
 from app.settings.config import ID_CARPETA_MADRE, BUCKET_NAME
-
+import httplib2
 
 def get_services():
     """
     Inicializa los servicios de Drive y Storage usando Application Default Credentials (ADC).
     En GCP, esto toma automáticamente los permisos de la Service Account asociada.
     """
+    http = httplib2.Http(timeout=60)
     try:
         creds, project = google.auth.default(
             scopes=[
@@ -22,7 +23,7 @@ def get_services():
                 'https://www.googleapis.com/auth/cloud-platform'
             ]
         )
-        drive_service = build('drive', 'v3', credentials=creds)
+        drive_service = build('drive', 'v3', credentials=creds, http=http)
         storage_client = storage.Client(credentials=creds)
         bucket_client = storage_client.bucket(BUCKET_NAME)
         return drive_service, bucket_client
