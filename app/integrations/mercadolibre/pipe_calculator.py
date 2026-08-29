@@ -1,5 +1,5 @@
 from app.service.secrets import meli_secrets
-from app.service.meli_api import get_data_for_meli, _generate_category_options, calculate_cost
+from app.integrations.mercadolibre.meli_api import get_data_for_meli, _generate_category_options#, calculate_cost
 from app.utils.logger import logger
 
 def calculating_cost(response):
@@ -17,4 +17,4 @@ def calculating_cost(response):
         logger.warning("Settings is Empty, failed to run cost calulcation.")
         return
 
-    calculate_cost(item_data, user_id, token)
+    #calculate_cost(item_data, user_id, token)

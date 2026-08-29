@@ -1,118 +1,154 @@
 import json
 import requests
 from unidecode import unidecode
-from datetime import datetime
 from app.utils.logger import logger
-from app.service.llm_api import call_deepseek_api
-from app.service.notifications import enviar_mensaje_whapi
-from app.service.database import update_method, get_method, upsert_method
-from app.service.google_pictures import process_images_storage
-from app.settings.config import TOKEN_WHAPI, PHONE_INTERNAL, SCHEMA_INVENTORY, SCHEMA_MERCADOLIBRE
+from app.db.helpers import get_one, execute, get_all
+from app.integrations.google_drive.google_pictures import process_images_storage
+from app.settings.config import (
+    SCHEMA_INVENTORY, 
+    SCHEMA_MERCADOLIBRE, 
+    SCHEMA_ACCOUNTS
+)
 
-ATTRIBUTES_TABLE = 'attributes'
-PRODUCTS_TABLE = 'product_catalog_sync'
-COSTS_TABLE = 'selling_calculation'
-PROD_STATUS_TABLE= 'product_status'
-
-def ai_error_handling(api_response, user_message, item_id):
-    logger.info("Improving Error message with AI and updating DB for Customer Visibility.")
-    sys_prompt = """
-    Your task is to process a JSON error response returned by the Mercado Libre API and 
-    produce a cleaner, shorter explanation in Spanish that a non-technical user can easily understand.
-    Rules:
-    - The response must be formatted as bullet points.
-    - Use fewer than 255 characters.
-    - Remove any single or double quotation marks.
-    """
-    user_prompt = api_response.json()
-    error_clean = call_deepseek_api(sys_prompt, user_prompt)
-    message = f"{user_message}:\n {error_clean}"
-    data = {
-    'id': {'value': item_id, 'type': 'char'},
-    'status': {'value': 'Error.', 'type': 'char'},
-    'reason': {'value': error_clean, 'type': 'char'},
-    'remedy': {'value': None, 'type': 'char'},
-    }
-    enviar_mensaje_whapi(TOKEN_WHAPI, PHONE_INTERNAL, message)
-    update_method(data, SCHEMA_INVENTORY, PRODUCTS_TABLE)
+PRODUCTS_TABLE= 'products'
+ATTRIBUTES_TABLE= 'attributes'
+PRODUCT_LISTING_TABLE= 'product_listings'
+CREDS_TABLE= 'credentials'
+IMAGES_TABLE= 'product_images'
+VARIANTS_TABLE= 'variation_listings'
+COSTS_TABLE= 'selling_calculation'
 
 
-
-def get_data_for_meli(item_id):
-    """"""
-    query = {
-        'q_columns': [
-            'a.id',
-            'a.price',
-            'a.product_code',
-            'a.product_name',
-            'a.product_image_b_format_url',
-            'a.stock',
-            'a.cost',
-            'a.description',
-            'a.brand',
-            'a.model',
-            'a.dimentions',
-            'a.drive_url',
-            'a.product_name_meli',
-            'a.meli_id',
-            'a.price_mercadolibre',
-            'b.category_options',
-            'b.category_id',
-            'b.currency_id',
-            'b.buying_mode',
-            'b.condition_type',
-            'b.settings',
-            'c.variants'
-        ],
-        'q_from':f'FROM {SCHEMA_INVENTORY}.{PRODUCTS_TABLE} as a',
-        'q_join':[f'LEFT JOIN {SCHEMA_MERCADOLIBRE}.{ATTRIBUTES_TABLE} as b on b.item_id = a.id',
-                  f'LEFT JOIN {SCHEMA_MERCADOLIBRE}.{PROD_STATUS_TABLE} as c on c.meli_id = a.meli_id'],
-        'q_where': f'WHERE a.id = {item_id}',
-        'q_limit':'LIMIT 1'
-    }
-    item_data = get_method(query)
-    return item_data[0]
+def get_meli_token(ecommerce_account_id):
+    sql = (
+        "SELECT "
+        + "a.access_token "
+        + "FROM " + SCHEMA_ACCOUNTS + "." + CREDS_TABLE + " AS a "
+        + "WHERE a.ecommerce_account_id = :ecommerce_account_id "
+    )
+    try:
+        return get_one(sql, {"ecommerce_account_id": ecommerce_account_id,})
+    except LookupError:
+        return {}
 
 
-def is_valid_gtin(gtin):
-    """
-    Valida códigos GTIN-8, GTIN-12, GTIN-13 y GTIN-14.
-    """
-    gtin = str(gtin).strip()
+def get_data_for_meli(product_id):
+    sql = (
+        "SELECT "
+        + "a.id, "
+        + "a.price, "
+        + "a.internal_code, "
+        + "a.sku, "
+        + "a.gtin, "
+        + "a.name, "
+        + "a.name_edited, "
+        + "a.stock, "
+        + "a.cost, "
+        + "a.description, "
+        + "a.brand, "
+        + "a.model, "
+        + "a.dimensions, "
+        + "a.drive_url, "
+        + "b.id AS product_listing_id, "
+        + "b.meli_id, "
+        + "b.price AS price_meli, "
+        + "c.id AS attribute_id, "
+        + "c.category_options, "
+        + "c.category_id, "
+        + "c.currency_id, "
+        + "c.buying_mode, "
+        + "c.condition_type, "
+        + "c.settings "
+        + "FROM " + SCHEMA_INVENTORY + "." + PRODUCTS_TABLE + " AS a "
+        + "LEFT JOIN " + SCHEMA_MERCADOLIBRE + "." + PRODUCT_LISTING_TABLE + " AS b ON b.product_id = a.id "
+        + "LEFT JOIN " + SCHEMA_MERCADOLIBRE + "." + ATTRIBUTES_TABLE + " AS c ON c.product_listing_id = b.id "
+        + "WHERE a.id = :product_id "
+    )
+    row = get_one(sql, {"product_id": product_id,})
+    return row
 
-    if len(gtin) not in (8, 12, 13, 14):
-        return False
 
-    if not gtin.isdigit():
-        return False
+def get_product_images(product_id):
+    sql = (
+        "SELECT "
+        + "url "
+        + "FROM " + SCHEMA_INVENTORY + "." + IMAGES_TABLE + " " 
+        + "WHERE product_id = :product_id "
+    )
+    try:
+        return get_all(sql, {"product_id": product_id,})
+    except LookupError:
+        return []
 
-    digits = [int(d) for d in gtin]
-    check_digit = digits[-1]
-    body = digits[:-1]
 
-    total = 0
-    weight = 3
-    for digit in reversed(body):
-        total += digit * weight
-        weight = 1 if weight == 3 else 3
+def get_product_variants(product_id):
+    sql = (
+        "SELECT "
+        + "id "
+        + "FROM " + SCHEMA_MERCADOLIBRE + "." + VARIANTS_TABLE + " " 
+        + "WHERE product_listing_id = :product_id "
+    )
+    try:
+        return get_one(sql, {"product_id": product_id,})
+    except LookupError:
+        return {}
 
-    calculated = (10 - (total % 10)) % 10
-    return calculated == check_digit
+
+
+
+def _update_record(product_id, data, table):
+    fields = []
+    params = {"id": product_id}
+    for field, value in data.items():
+        if value is not None:
+            fields.append(f"{field} = :{field}")
+            params[field] = value
+    if not fields:
+        return
+    
+    sql = (
+        "UPDATE " + SCHEMA_MERCADOLIBRE + "." + table
+        + " SET " + ", ".join(fields)
+        + " WHERE id = :id"
+    )
+    rowcount = execute(sql, params)
+    logger.info("Rows Affected: ")
+    logger.info(rowcount)
+
+
+def _delete_record(product_id, table):
+    logger.info(f"Deleting: {product_id}")
+    sql = (
+        "DELETE FROM " + SCHEMA_MERCADOLIBRE + "." + table
+        + " WHERE id = :id"
+    )
+    rowcount = execute(sql, {'id': product_id})
+    logger.info("Rows Affected: ")
+    logger.info(rowcount)
+
+
+
 
 def _aux_product_format(item_data):
     """"""
     logger.info("Creating Product Schema for Mercadolibre.")
 
-    item_id = item_data['id']
-    public_images = process_images_storage(item_id)
-    #public_images=[]
+    internal_code = item_data['internal_code']
+    ##PROBLEMA, SI AHORA PRODUCT ID ES EL ID DE LA TABLA LA RELACION CON FOLDER ROMPE.
+    ##TEMPORALMENTE LO VAMOS A DEJAR COMO internal_code, PARA NO ROMPER CON LA RELACION. (pero puede traer problemas si los id se repiten entre distintas cuentas.)
+    #public_images = process_images_storage(internal_code) 
+    
+    public_images=[]
+    
     if public_images == []:
-        logger.info("Without images in Folder, using image from Bitcram.")
-        public_images = [{'source': item_data["product_image_b_format_url"]}]
+        logger.info("Without images in Folder, using images from DB.")
+        product_id = item_data['id']
+        public_images = get_product_images(product_id)
+        public_images = [{'source': image["url"]} for image in public_images]
 
-    product_name = item_data["product_name_meli"] or item_data["product_name"]
-    price = item_data["price_mercadolibre"] or item_data["price"]
+
+    product_name = item_data["name_edited"] or item_data["name"]
+    price = item_data["price_meli"] or item_data["price"]
     settings = json.loads(item_data['settings'])
 
     value_added_tax_ids = {
@@ -158,32 +194,16 @@ def _aux_product_format(item_data):
         "sale_terms": []
     }
 
-    if not is_valid_gtin(item_data['product_code']):
-        product_code = {
-            "id": "SELLER_SKU",
-            "value_name": item_data['product_code']
-        }   
-
-        attr_gtin = {
-            "id": "GTIN",
-            "value_name": "N/A"
-        }   
-
-        gtin_reason = {
-            "id": "EMPTY_GTIN_REASON",
-            "value_id": "17055160"
-        }   
-
+    if item_data['gtin'] is None:
+        product_code = { "id": "SELLER_SKU", "value_name": item_data['sku']}   
+        attr_gtin = { "id": "GTIN", "value_name": "N/A"}   
+        gtin_reason = { "id": "EMPTY_GTIN_REASON", "value_id": "17055160"}   
         item_format['attributes'].append(product_code)
         item_format['attributes'].append(attr_gtin)
-        item_format['attributes'].append(gtin_reason)   
+        item_format['attributes'].append(gtin_reason)
 
     else:
-        product_code = {
-            "id": "GTIN",
-            "value_name": item_data['product_code']
-        }   
-
+        product_code = { "id": "GTIN", "value_name": item_data['gtin']}   
         item_format['attributes'].append(product_code)
 
     for setting_dict in settings:
@@ -216,11 +236,12 @@ def _aux_product_format(item_data):
             
             elif setting == 'listing':
                 item_format['listing_type_id'] = [v.get('user_input_value') for v in setting_dict[setting]][0]
-    
+
     return item_format
 
 
-def _generate_category_options(item_id, product_names, token):
+
+def _generate_category_options(product_id, product_names, token):
     """ Generate category ID trough Mercadolibre API.
         If Categoty already exists then returns None.
     """
@@ -231,23 +252,19 @@ def _generate_category_options(item_id, product_names, token):
             params={"q": product_name, "limit": 6}, 
             headers={"Authorization": f"Bearer {token}"}
         )
-        value = unidecode(json.dumps(response.json(), ensure_ascii=False).replace("'","").replace("\\n",""))
-        if value:
+        catg_options = unidecode(json.dumps(response.json(), ensure_ascii=False).replace("'","").replace("\\n",""))
+        if catg_options:
             break
-
     if response.status_code == 200:
-        data = {
-            'item_id': {'value': item_id, 'type': 'char'},
-            'category_options': {'value': value , 'type': 'json'},
-            'updated_at': {'value': datetime.now(), 'type': 'datetime'}
-        }
-        update_method(data, SCHEMA_MERCADOLIBRE, ATTRIBUTES_TABLE)
+        data = {'category_options': catg_options}
+        _update_record(product_id, data, ATTRIBUTES_TABLE)
     else:
         logger.error(f"Failed to create Category Options {response.text}")
     return
 
 
-def _settings_builder(item_id, category_id, price, token):
+
+def _settings_builder(attribute_id, category_id, price, token):
     """Return all required attributes giving the category"""
 
     logger.info("Running Settings Builder")
@@ -271,31 +288,22 @@ def _settings_builder(item_id, category_id, price, token):
     settings_list = [{'attributes':[]}, {'shipping':[]}, {'sale_terms':[]}, {'listing':[]}]
     
     for idx ,setting_dict in enumerate(settings_list):
+
         for setting in setting_dict:
             logger.info(f"Building {setting}..")
+
             if setting == 'attributes':
                 response = requests.get(f"https://api.mercadolibre.com/categories/{category_id}/{setting}", headers=HEADER)
+
                 if response.status_code > 300:
                     logger.info("Category Not Valid.")
-                    data = {
-                    'item_id': {
-                        'value': item_id, 
-                        'type': 'char'
-                        },
-                    'settings': {
-                        'value': json.dumps([{'Error': response.json()}]), 
-                        'type': 'json'
-                        },
-                    'updated_at': {
-                            'value': datetime.now(), 
-                            'type': 'datetime'
-                        }
-                    }
-                    update_method(data, SCHEMA_MERCADOLIBRE, ATTRIBUTES_TABLE)
+                    data = unidecode(json.dumps([{'Error': response.json()}], ensure_ascii=False).replace("'","").replace("\\n",""))
+                    data = {'settings': data}
+                    _update_record(attribute_id, data, ATTRIBUTES_TABLE)
                     return
+                
                 else:
                     response = response.json()
-                
 
             elif setting == 'sale_terms':
                 response = requests.get(f"https://api.mercadolibre.com/categories/{category_id}/{setting}", headers=HEADER).json()
@@ -372,63 +380,58 @@ def _settings_builder(item_id, category_id, price, token):
                     settings_list[idx][setting] += [values]
                     logger.info(f"{setting}: {id} added to json.")
 
-    data = {'item_id': {'value': item_id, 'type': 'char'}}
-    data['settings'] = {
-        'value': unidecode(json.dumps(settings_list, ensure_ascii=False).replace("'","").replace("\\n","")
-        ), 'type': 'json'
-    }
-    data['updated_at'] = {'value': datetime.now(), 'type': 'datetime'}
-    update_method(data, SCHEMA_MERCADOLIBRE, ATTRIBUTES_TABLE)
+    data = unidecode(json.dumps(settings_list, ensure_ascii=False).replace("'","").replace("\\n",""))
+    data = {'settings': data}
+    _update_record(attribute_id, data, ATTRIBUTES_TABLE)
 
-
-def prepublish_product(item_id, token):
+def prepublish_product(payload):
     """"""
     logger.info("Running Pre-Publish Action on Mercadolibre")
-    
-    item_data = get_data_for_meli(item_id)
-    product_names = [item_data["product_name_meli"], item_data["product_name"]]
-    price = item_data["price_mercadolibre"] or item_data["price"]
-    category_options = item_data['category_options']
-    category_id = item_data['category_id']
-    settings = item_data['settings']
+
+    product_id = payload.get('product_id')
+    ecommerce_account_id = payload.get('ecommerce_account_id')
+    token = get_meli_token(ecommerce_account_id).get('access_token')
+
+    product_data = get_data_for_meli(product_id)
+    product_names = [product_data["name_edited"], product_data["name"]]
+    price = product_data["price_meli"] or product_data["price"]
+    category_options = product_data['category_options']
+    category_id = product_data['category_id']
+    settings = product_data['settings']
+    attribute_id = product_data['attribute_id']
+
     if settings:
         settings = json.loads(settings)
         settings_error_check = [i for i in settings][0].get('Error', False)
 
     if category_options is None or category_options=='[]':
-        _generate_category_options(item_id, product_names, token)
+        _generate_category_options(product_id, product_names, token)
 
     elif category_id is not None and (settings is None or settings_error_check):
-        _settings_builder(item_id, category_id, price, token)
+        _settings_builder(attribute_id, category_id, price, token)
     
     elif category_id is None and category_options is not None:
-        data = {
-        'item_id': {
-            'value': item_id, 
-            'type': 'char'
-            },
-        'settings': {
-            'value': json.dumps([{'Error': 'Para generar los settings es neceasario seleccionar una categoria y correr el evento de Pre-Publish.'}]), 
-            'type': 'json'
-            },
-        'updated_at': {
-                'value': datetime.now(), 
-                'type': 'datetime'
-            }
-        }
-        update_method(data, SCHEMA_MERCADOLIBRE, ATTRIBUTES_TABLE)
-    
+        data = json.dumps([{'Error': 'Para generar los settings es neceasario seleccionar una categoria y correr el evento de Pre-Publish.'}])
+        data = unidecode(data.replace("'","").replace("\\n",""))
+        data = {'settings': data}
+        _update_record(attribute_id, data, ATTRIBUTES_TABLE)
     return
 
 
-def publish_item(item_id, token):
+
+def publish_item(payload):
     """publish the item with a second try option"""
 
+    product_id = payload.get('product_id')
+    ecommerce_account_id = payload.get('ecommerce_account_id')
+    token = get_meli_token(ecommerce_account_id).get('access_token')
+
     logger.info("Running Publish Action on Mercadolibre")
-    item_data = get_data_for_meli(item_id)
+    item_data = get_data_for_meli(product_id)
+
     logger.info("Step 1: Checking if product is already publish.")
     if item_data['meli_id']:
-        logger.warning(f"""Item: {item_id} already exists in mercadolibre 
+        logger.warning(f"""Item: {product_id} already exists in mercadolibre 
             under this ID: {item_data['meli_id']}, nothing to do.""")
         return
     
@@ -437,54 +440,59 @@ def publish_item(item_id, token):
     response = requests.post("https://api.mercadolibre.com/items", 
                     json=item_format,
                     headers={"Authorization": f"Bearer {token}"})
-        
+    product_listing_id = item_data['product_listing_id']
     if response.status_code < 300:
         logger.info("Publishing Item Done Succesfully.")
         meli_id = response.json().get('id')
         permalink = response.json().get('permalink')
         _set_description(meli_id, item_data["description"], token)
+        
         data = {
-        'id': {
-            'value': item_id, 
-            'type': 'char'
-            },
-        'meli_id': {
-            'value': meli_id, 
-            'type': 'char'
-            },
-        'permalink': {
-            'value': permalink, 
-            'type': 'char'
-            },
-        'status': {
-            'value': 'Procesando..', 
-            'type': 'char'
-            },
-        'reason': {
-            'value': 'Procesando..', 
-            'type': 'char'
-            },
-        'remedy': {
-            'value': 'Procesando..', 
-            'type': 'char'
-            },
+        'meli_id': meli_id, 
+        'permalink': permalink, 
+        'status': 'Procesando..', 
+        'reason': 'Procesando..', 
+        'remedy': 'Procesando..', 
         }
-        update_method(data, SCHEMA_INVENTORY, PRODUCTS_TABLE)
+        _update_record(product_listing_id, data, PRODUCT_LISTING_TABLE)
+        
     else:
-        user_message = f"Error while publishing item: {item_id}"
-        logger.info(response.json())
-        ai_error_handling(response, user_message, item_id)
+        ##MEJORAR ACA VER SI SE PUEDE EXTRAER REMEDY DESDE EL RESPONSE.
+        logger.info("Failed to Publish.")
+        error = json.dumps([response.json()])
+        error = unidecode(error.replace("'","").replace("\\n",""))
+        data = {
+        'status': 'Failed to Publish.', 
+        'reason': error, 
+        'remedy': 'None', 
+        }
+        _update_record(product_listing_id, data, PRODUCT_LISTING_TABLE)
     return
 
 
 
-def update_item(item_id, token):
+def update_item(payload):
     """Update MercadoLibre item"""
+
+    product_id = payload.get('product_id')
+    product_listing_id = payload.get('product_listing_id')
+    ecommerce_account_id = payload.get('ecommerce_account_id')
+    token = get_meli_token(ecommerce_account_id).get('access_token')
     
     logger.info("Running Update Action on Mercadolibre")
-    item_data = get_data_for_meli(item_id)
+    item_data = get_data_for_meli(product_id)
     meli_id = item_data['meli_id']
-    variants = json.loads(item_data['variants'] or "{}")
+
+    variants = get_product_variants(product_id)
+    if variants.get('id'):
+        logger.info("The Product has variations")
+        data = {
+        'status': 'Failed to Update.', 
+        'reason': 'Product has variations.', 
+        'remedy': 'None', 
+        }
+        _update_record(product_listing_id, data, PRODUCT_LISTING_TABLE)
+        return
 
     if meli_id is None or meli_id == '':
         logger.error(f"Item: {item_data['id']} is not published, nothing to update.")
@@ -514,28 +522,32 @@ def update_item(item_id, token):
         """If item is paused, then try to reactive, else do nothing."""
         if status == 'paused':
             logger.info(f"Item {meli_id} is PAUSED. Attempting to re-activate...")
-            data = {"status": "active"}
-            response = requests.put(url=url, headers=headers, json=data)
+            response = requests.put(url=url, headers=headers, json={"status": "active"})
             if response.status_code < 300:
                 logger.info("Reactivate Done.")
             else:
-                user_message = f"Error while reactivating product: {meli_id}"
-                ai_error_handling(response, user_message, item_id)
-
+                error = json.dumps([response.json()])
+                error = unidecode(error.replace("'","").replace("\\n",""))
+                data = {
+                'status': 'Failed to Reactivate.', 
+                'reason': error, 
+                'remedy': 'None', 
+                }
+                _update_record(product_listing_id, data, PRODUCT_LISTING_TABLE)
+            return
 
 
 
     status, sub_status, sold_quantity = _item_status()
     if status == 'under_review' and sub_status == 'forbidden':
         logger.info(f"Product in Forbidden status: {meli_id}, we are gonna delete and publish again.")
-        delete_item(item_id, token)
-        publish_item(item_id, token)
+        delete_item(payload)
+        publish_item(payload)
         return
     
     else:
         logger.info("Formatting item data for update..")
         item_format = _aux_product_format(item_data)
-        
 
         listing_type_id = item_format.get('listing_type_id')
         del item_format['category_id']
@@ -561,33 +573,41 @@ def update_item(item_id, token):
 
     def _aux_update_item():
         nonlocal item_format
-        
-        if variants.get('variations'):
-            logger.info("The Product has variations")
-            item_format = {'variations': variants['variations']}
+    
         response = requests.put(url=url, json=item_format, headers=headers)
         if response.status_code < 300:
             logger.info("General Update Done.")
             _set_description(meli_id, item_data['description'], token, update=True)
             _aux_update_listing()
             _aux_reactivate_item()
-        else:
-            user_message = f"Error while updating product: {meli_id}"
-            logger.info(response.json())
-            ai_error_handling(response, user_message, item_id)
 
+        else:
+            error = json.dumps([response.json()])
+            error = unidecode(error.replace("'","").replace("\\n",""))
+            data = {
+            'status': 'Failed to Update.', 
+            'reason': error, 
+            'remedy': 'None', 
+            }
+            _update_record(product_listing_id, data, PRODUCT_LISTING_TABLE)
+            return
 
     _aux_update_item()
     return
 
  
 
-def pause_item(item_id, token):
+def pause_item(payload):
     """Changes item status to paused in Mercado Libre"""
 
+    product_id = payload.get('product_id')
+    ecommerce_account_id = payload.get('ecommerce_account_id')
+    token = get_meli_token(ecommerce_account_id).get('access_token')
+
     logger.info("Running Pause Action on Mercadolibre")
-    item_data = get_data_for_meli(item_id)
+    item_data = get_data_for_meli(product_id)
     meli_id = item_data['meli_id'] 
+    product_listing_id = item_data['product_listing_id']
 
     if meli_id is None:
         logger.error(f"Product: {item_data['id']} is not published, nothing to update.")
@@ -598,27 +618,43 @@ def pause_item(item_id, token):
             json={"status": "paused"},
             headers={ "Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     )
+    
     if response.status_code == 200:
         logger.info(f"Product: {meli_id} successfully paused.")
+        data = {
+        'status': 'Paused.', 
+        'reason': 'User Action.', 
+        'remedy': 'None', 
+        }
+        _update_record(product_listing_id, data, PRODUCT_LISTING_TABLE)
+
     else:
-        logger.error(f"""
-            Failed to pause item {meli_id}.\n 
-            Status: {response.status_code}.\n 
-            Error:\n {response.json()}"""
-        )
-        enviar_mensaje_whapi(TOKEN_WHAPI, PHONE_INTERNAL, response.json())
+        error = json.dumps([response.json()])
+        error = unidecode(error.replace("'","").replace("\\n",""))
+        data = {
+        'status': 'Failed to Pause.', 
+        'reason': error, 
+        'remedy': 'None', 
+        }
+        _update_record(product_listing_id, data, PRODUCT_LISTING_TABLE)
     return
 
 
-def delete_item(item_id, token):
+def delete_item(payload):
     """"""
 
+    product_id = payload.get('product_id')
+    ecommerce_account_id = payload.get('ecommerce_account_id')
+    token = get_meli_token(ecommerce_account_id).get('access_token')
+
     logger.info("Running Delete Action on Mercadolibre")
-    item_data = get_data_for_meli(item_id)
+    item_data = get_data_for_meli(product_id)
     meli_id = item_data['meli_id']
+    product_listing_id = item_data['product_listing_id']
+
 
     if meli_id is None:
-        logger.error(f"Product: {item_id} is not published, nothing to delete.")
+        logger.error(f"Product: {product_id} is not published, nothing to delete.")
         return
     
     url = f"https://api.mercadolibre.com/items/{meli_id}"
@@ -627,16 +663,7 @@ def delete_item(item_id, token):
     var_deleted = {"deleted": "true"}
     requests.put(url=url, json=var_closed, headers=headers)
     requests.put(url=url, json=var_deleted, headers=headers)
-
-    data = {
-        'id': {'value': item_id, 'type': 'char'},
-        'status': {'value': None, 'type': 'char'},
-        'reason': {'value': None, 'type': 'char'},
-        'remedy': {'value': None, 'type': 'char'},
-        'permalink': {'value': None, 'type': 'char'},
-        'meli_id': {'value': None, 'type': 'char'},
-        }
-    update_method(data, SCHEMA_INVENTORY, PRODUCTS_TABLE)
+    _delete_record(product_listing_id, PRODUCT_LISTING_TABLE)
     return
 
     
@@ -663,84 +690,85 @@ def _set_description(meli_id, description, token, update=False):
         logger.info("Description dont exists, nothing to do.")
 
 
-def calculate_cost(item_data:dict, user_id:str, token:str):
-    """Calculate the cost for selling in mercadolibre."""
-
-    logger.info("Running Cost Calculation Action")
-    header = {'Authorization': f'Bearer {token}'}
-
-    all_settings_groups = json.loads(item_data.get("settings"))
-    for settings_group in all_settings_groups:
-        for section_name in settings_group:
-            if section_name == "shipping":
-                for variable in settings_group[section_name]:
-                    if variable.get('id') == 'FREE_SHIPPING':
-                        free_shipping = variable.get('user_input_value')
-                    if variable.get('id') == 'MODE':
-                        shipping_mode = variable.get('user_input_value')
-                    if variable.get('id') == 'LOGISTIC_TYPE':
-                        logistic_type = variable.get('user_input_value')
-
-            elif section_name == "listing":
-                for variable in settings_group[section_name]:
-                    if variable.get('id') == 'LISTING_TYPE':
-                        listing_type = variable.get('user_input_value')
-    
-    item_id = item_data.get('id')
-    condition_type = item_data.get('condition_type')
-    category_id = item_data.get('category_id')
-    currency = item_data.get('currency_id')
-    dimentions = item_data.get('dimentions')
-    billable_weight = 5828
-    price = item_data.get("price_mercadolibre") if item_data.get("price_mercadolibre") else item_data.get("price")
-    
-
-    logger.info("Step 1. Calculating Selling Cost (without shipping)")
-    url = (
-        f"https://api.mercadolibre.com/sites/MLA/listing_prices?"
-        f"category_id={category_id}&price={price}&cy_id={currency}&"
-        f"logistic_type={logistic_type}&shipping_modes={shipping_mode}&"
-        f"listing_type_id={listing_type}&billable_weight={billable_weight}&"
-    )    
-    response = requests.get(url=url,headers=header)
-    if response.status_code > 300:
-        user_message = f"Error while calculating cost for product: {item_id}: {response.json()}"
-        logger.error(user_message)
-        return
-    
-    response = response.json()
-    cost_detail = {
-        'item_id':{'value': item_id, 'type':'char'},
-        'sale_fee_amount':{'value': response['sale_fee_amount'], 'type':'float'}, 
-        'fixed_fee':{'value':  response['sale_fee_details']['fixed_fee'], 'type':'float'}, 
-        'financing_add_on_fee':{'value':  response['sale_fee_details']['financing_add_on_fee'], 'type':'float'}, 
-        'meli_percentage_fee':{'value':  response['sale_fee_details']['meli_percentage_fee'], 'type':'float'},
-        'percentage_fee':{'value':  response['sale_fee_details']['percentage_fee'], 'type':'float'},
-        'gross_amount':{'value':  response['sale_fee_details']['gross_amount'], 'type':'float'},
-        'listing_fixed_fee':{'value': response['listing_fee_details']['fixed_fee'], 'type':'float'}, 
-        'listing_gross_amount':{'value': response['listing_fee_details']['gross_amount'], 'type':'float'}, 
-    }
-
-    logger.info("Step 2. Calculating Shipping Cost")
-    url = (
-        f"https://api.mercadolibre.com/users/{user_id}/"
-        f"shipping_options/free?dimensions={dimentions}&"
-        f"verbose=true&item_price={price}&category_id={category_id}&"
-        f"listing_type_id={listing_type}&mode={shipping_mode}&"
-        f"condition={condition_type}&logistic_type={logistic_type}&free_shipping={free_shipping}"
-    )
-    response = requests.get(url=url, headers=header)
-    if response.status_code > 300:
-        user_message = f"Error while calculating cost for product: {item_id}: {response.json()}"
-        logger.error(user_message)
-        return
-    
-    response = response.json()
-    cost_detail['ship_cost_amount'] = {'value': response['coverage']['all_country']['list_cost'], 'type': 'float'}
-    cost_detail['ship_discount'] = {'value': response['coverage']['all_country']['discount']['rate'], 'type': 'float'}
-    cost_detail['ship_cost_full_amount'] = {'value': response['coverage']['all_country']['discount']['promoted_amount'], 'type': 'float'}
-    total_selling_cost = cost_detail.get('ship_cost_amount').get('value') + cost_detail.get('sale_fee_amount').get('value')
-    cost_detail['total_selling_cost'] = {'value': total_selling_cost, 'type': 'float'}
-    
-    upsert_method(cost_detail, SCHEMA_MERCADOLIBRE, COSTS_TABLE )
-    return
+#def calculate_cost(item_data:dict, user_id:str, token:str):
+#    """Calculate the cost for selling in mercadolibre."""
+#
+#    logger.info("Running Cost Calculation Action")
+#    header = {'Authorization': f'Bearer {token}'}
+#
+#    all_settings_groups = json.loads(item_data.get("settings"))
+#    for settings_group in all_settings_groups:
+#        for section_name in settings_group:
+#            if section_name == "shipping":
+#                for variable in settings_group[section_name]:
+#                    if variable.get('id') == 'FREE_SHIPPING':
+#                        free_shipping = variable.get('user_input_value')
+#                    if variable.get('id') == 'MODE':
+#                        shipping_mode = variable.get('user_input_value')
+#                    if variable.get('id') == 'LOGISTIC_TYPE':
+#                        logistic_type = variable.get('user_input_value')
+#
+#            elif section_name == "listing":
+#                for variable in settings_group[section_name]:
+#                    if variable.get('id') == 'LISTING_TYPE':
+#                        listing_type = variable.get('user_input_value')
+#    
+#    item_id = item_data.get('id')
+#    condition_type = item_data.get('condition_type')
+#    category_id = item_data.get('category_id')
+#    currency = item_data.get('currency_id')
+#    dimentions = item_data.get('dimentions')
+#    billable_weight = 5828
+#    price = item_data.get("price_mercadolibre") if item_data.get("price_mercadolibre") else item_data.get("price")
+#    
+#
+#    logger.info("Step 1. Calculating Selling Cost (without shipping)")
+#    url = (
+#        f"https://api.mercadolibre.com/sites/MLA/listing_prices?"
+#        f"category_id={category_id}&price={price}&cy_id={currency}&"
+#        f"logistic_type={logistic_type}&shipping_modes={shipping_mode}&"
+#        f"listing_type_id={listing_type}&billable_weight={billable_weight}&"
+#    )    
+#    response = requests.get(url=url,headers=header)
+#    if response.status_code > 300:
+#        user_message = f"Error while calculating cost for product: {item_id}: {response.json()}"
+#        logger.error(user_message)
+#        return
+#    
+#    response = response.json()
+#    cost_detail = {
+#        'item_id':{'value': item_id, 'type':'char'},
+#        'sale_fee_amount':{'value': response['sale_fee_amount'], 'type':'float'}, 
+#        'fixed_fee':{'value':  response['sale_fee_details']['fixed_fee'], 'type':'float'}, 
+#        'financing_add_on_fee':{'value':  response['sale_fee_details']['financing_add_on_fee'], 'type':'float'}, 
+#        'meli_percentage_fee':{'value':  response['sale_fee_details']['meli_percentage_fee'], 'type':'float'},
+#        'percentage_fee':{'value':  response['sale_fee_details']['percentage_fee'], 'type':'float'},
+#        'gross_amount':{'value':  response['sale_fee_details']['gross_amount'], 'type':'float'},
+#        'listing_fixed_fee':{'value': response['listing_fee_details']['fixed_fee'], 'type':'float'}, 
+#        'listing_gross_amount':{'value': response['listing_fee_details']['gross_amount'], 'type':'float'}, 
+#    }
+#
+#    logger.info("Step 2. Calculating Shipping Cost")
+#    url = (
+#        f"https://api.mercadolibre.com/users/{user_id}/"
+#        f"shipping_options/free?dimensions={dimentions}&"
+#        f"verbose=true&item_price={price}&category_id={category_id}&"
+#        f"listing_type_id={listing_type}&mode={shipping_mode}&"
+#        f"condition={condition_type}&logistic_type={logistic_type}&free_shipping={free_shipping}"
+#    )
+#    response = requests.get(url=url, headers=header)
+#    if response.status_code > 300:
+#        user_message = f"Error while calculating cost for product: {item_id}: {response.json()}"
+#        logger.error(user_message)
+#        return
+#    
+#    response = response.json()
+#    cost_detail['ship_cost_amount'] = {'value': response['coverage']['all_country']['list_cost'], 'type': 'float'}
+#    cost_detail['ship_discount'] = {'value': response['coverage']['all_country']['discount']['rate'], 'type': 'float'}
+#    cost_detail['ship_cost_full_amount'] = {'value': response['coverage']['all_country']['discount']['promoted_amount'], 'type': 'float'}
+#    total_selling_cost = cost_detail.get('ship_cost_amount').get('value') + cost_detail.get('sale_fee_amount').get('value')
+#    cost_detail['total_selling_cost'] = {'value': total_selling_cost, 'type': 'float'}
+#    
+#    upsert_method(cost_detail, SCHEMA_MERCADOLIBRE, COSTS_TABLE )
+#    return
+#

@@ -1,0 +1,26 @@
+##MOVER A LOGICA DE SQL.!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+##ES IMPORTANTE NORMALIZARLO DIRECTAMENTE EN PRODUCTS.
+def is_valid_gtin(gtin): 
+    """
+    Valida códigos GTIN-8, GTIN-12, GTIN-13 y GTIN-14.
+    """
+    gtin = str(gtin).strip()
+
+    if len(gtin) not in (8, 12, 13, 14):
+        return False
+
+    if not gtin.isdigit():
+        return False
+
+    digits = [int(d) for d in gtin]
+    check_digit = digits[-1]
+    body = digits[:-1]
+
+    total = 0
+    weight = 3
+    for digit in reversed(body):
+        total += digit * weight
+        weight = 1 if weight == 3 else 3
+
+    calculated = (10 - (total % 10)) % 10
+    return calculated == check_digit

@@ -1,7 +1,7 @@
 from app.utils.logger import logger
 from app.service.secrets import meli_secrets, tienda_nube_secrets
-from app.service.database import get_order, insert_order, get_method, get_tienda_nube_id, upsert_method
-from app.service.post_bitcram import sell_workflow
+from app.db.database import get_order, insert_order, get_method, get_tienda_nube_id, upsert_method
+from app.integrations.bitcram.post_bitcram import sell_workflow
 from app.service.notifications import enviar_mensaje_whapi
 from app.settings.config import (
     PHONE_INTERNAL, 

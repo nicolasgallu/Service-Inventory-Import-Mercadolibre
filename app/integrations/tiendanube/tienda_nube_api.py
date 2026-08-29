@@ -1,9 +1,9 @@
-from app.service.database import ( 
+from app.db.database import ( 
     get_method,
     upsert_method,
     update_method
 )
-from app.service.google_pictures import process_images_storage
+from app.integrations.google_drive.google_pictures import process_images_storage
 from app.service.secrets import tienda_nube_secrets
 import requests
 import json

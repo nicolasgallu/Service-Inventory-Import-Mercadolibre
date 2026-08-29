@@ -20,6 +20,3 @@ steps:
 
 images:
   - 'us-central1-docker.pkg.dev/nicoservertest/service-import-ecommerce/service-import-ecommerce:$COMMIT_SHA'
-
-
-  

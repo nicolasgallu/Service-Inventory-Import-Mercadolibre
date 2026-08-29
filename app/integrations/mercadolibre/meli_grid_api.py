@@ -4,8 +4,8 @@ from unidecode import unidecode
 import requests
 from app.utils.logger import logger
 from app.service.secrets import meli_secrets
-from app.service.meli_api import publish_item
-from app.service.database import get_method, upsert_method
+#from app.integrations.mercadolibre.meli_api import publish_item
+from app.db.database import get_method, upsert_method
 from app.settings.config import SCHEMA_MERCADOLIBRE, SCHEMA_INVENTORY
 
 PRODUCTS_TABLE = 'product_catalog_sync'
@@ -318,7 +318,7 @@ def create_grid(item_id):
             'settings': {'value': clean_json, 'type': 'JSON'},
         }
         upsert_method(new_settings, SCHEMA_MERCADOLIBRE, ATTRIBUTES_TABLE)
-        publish_item(item_id, meli_secrets())
+        #publish_item(item_id, meli_secrets())
   
     except requests.HTTPError:
         clean_json = unidecode(json.dumps(response.json(), 

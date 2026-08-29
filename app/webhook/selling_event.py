@@ -1,6 +1,6 @@
 from app.utils.logger import logger
 from flask import Blueprint, request, jsonify
-from app.service.pipe_selling import pipeline_selling
+from app.pipelines.pipe_selling import pipeline_selling
 import threading
 
 memory = set()

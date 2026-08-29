@@ -12,7 +12,7 @@ from google.oauth2 import credentials
 from google.auth.transport.requests import Request
 
 from app.settings.config import PROJECT_ID
-from app.service.database import get_item_data
+from app.db.database import get_item_data
 from app.service.secrets import meli_secrets
 from app.utils.logger import logger
 
@@ -69,6 +69,7 @@ def mvp_meli_pictures(item_id):
     Entry point for the Cloud Function.
     Now uses a direct folder URL instead of searching by name.
     """
+    logger.info("executing mvp meli pictures job")
     try:
         # 1. Get Folder ID directly from the provided URL
         meli_id = get_item_data(item_id).get('meli_id')

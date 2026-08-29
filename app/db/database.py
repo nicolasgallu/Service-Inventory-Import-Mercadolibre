@@ -28,6 +28,27 @@ engine = create_engine(
     )
 
 
+
+def get_businesses():
+    """Test database connection and retrieve businesses."""
+
+    with engine.begin() as conn:
+        logger.info("Extracting businesses.")
+
+        result = conn.execute(
+            text("""
+                SELECT *
+                FROM platform_accounts.businesses;
+            """)
+        )
+
+        data = [dict(row) for row in result.mappings()]
+
+        print(data )
+
+
+
+
 def get_tienda_nube_id(id):
     """"""
     with engine.begin() as conn:

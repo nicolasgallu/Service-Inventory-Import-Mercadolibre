@@ -1,7 +1,7 @@
 from flask import Flask
-from app.webhook.publish_event import meli_publish
+from app.api.publish_event import meli_publish
 from app.webhook.selling_event import meli_sell
-from app.webhook.calculate_cost import wh_calculation
+from app.api.calculate_cost import wh_calculation
 
 def create_app():
     app = Flask(__name__)

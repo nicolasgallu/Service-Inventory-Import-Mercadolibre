@@ -1,5 +1,5 @@
 import threading
-from app.service.pipe_calculator import calculating_cost
+from app.integrations.mercadolibre.pipe_calculator import calculating_cost
 from app.utils.logger import logger
 from app.settings.config import SECRET_GUIAS
 from flask import Blueprint, request, Response, jsonify
