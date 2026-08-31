@@ -23,7 +23,7 @@ def get_data_for_tnube(item_id):
     query = {
         'q_columns': [
             'a.price',
-            'a.product_name',
+            'a.product_name', 
             'a.product_image_b_format_url',
             'a.stock',
             'a.cost',

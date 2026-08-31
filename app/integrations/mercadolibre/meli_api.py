@@ -257,6 +257,8 @@ def _generate_category_options(product_id, product_names, token):
             break
     if response.status_code == 200:
         data = {'category_options': catg_options}
+        logger.info(product_id)
+        logger.info(data)
         _update_record(product_id, data, ATTRIBUTES_TABLE)
     else:
         logger.error(f"Failed to create Category Options {response.text}")
@@ -399,16 +401,17 @@ def prepublish_product(payload):
     category_id = product_data['category_id']
     settings = product_data['settings']
     attribute_id = product_data['attribute_id']
+    product_listing_id = product_data['product_listing_id']
 
     if settings:
         settings = json.loads(settings)
         settings_error_check = [i for i in settings][0].get('Error', False)
 
     if category_options is None or category_options=='[]':
-        _generate_category_options(product_id, product_names, token)
+        _generate_category_options(product_listing_id, product_names, token)
 
     elif category_id is not None and (settings is None or settings_error_check):
-        _settings_builder(attribute_id, category_id, price, token)
+        _settings_builder(product_listing_id, category_id, price, token)
     
     elif category_id is None and category_options is not None:
         data = json.dumps([{'Error': 'Para generar los settings es neceasario seleccionar una categoria y correr el evento de Pre-Publish.'}])

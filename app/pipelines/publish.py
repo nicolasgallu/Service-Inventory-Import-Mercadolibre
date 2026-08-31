@@ -1,21 +1,23 @@
 import asyncio
 from app.service.ai_completation import ai_call_prepublish
-from app.integrations.mercadolibre.meli_grid_api import create_template, create_grid
+from app.integrations.mercadolibre.grid_size import create_template, create_grid
 from app.integrations.mercadolibre.meli_api import prepublish_product, publish_item, update_item, pause_item, delete_item
-from app.integrations.tiendanube.tienda_nube_api import create_categories, tienda_nube_publish_item, tienda_nube_update_item, tienda_nube_delete_item
-from app.integrations.mercadolibre.meli_ai_images import mvp_meli_pictures
+from app.integrations.tiendanube.product_handler import create_categories, tienda_nube_publish_item, tienda_nube_update_item, tienda_nube_delete_item
+from app.integrations.mercadolibre.ai_images import mvp_meli_pictures
 from app.utils.logger import logger
 
 def pipeline_publish(payload):
 
     product_id = payload.get('product_id')
     event_type = payload.get('event_type')
+    site = payload.get('site')
 
     logger.info(f"Event Received: {event_type}")
     if event_type == 'pre-publish':
         asyncio.run(ai_call_prepublish(payload))
         prepublish_product(payload)
 
+    
 #    elif 'site' in payload:
 #        if payload['site'] == 'tienda-nube':
 #            logger.info("TiendaNube Product Notification")        

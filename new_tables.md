@@ -25,14 +25,17 @@ CREATE SCHEMA IF NOT EXISTS mercadolibre;
 CREATE TABLE platform_accounts.businesses (
     id INT PRIMARY KEY AUTO_INCREMENT,
     email VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
     full_name VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 ```
 
+--The external_account_id is ecommerce agnostic.
+--For meli the user_id and for tiendanube the store_id. 
 ```sql
-CREATE TABLE platform_accounts.ecommerce_accounts (
+CREATE TABLE platform_accounts.accounts (
     id INT PRIMARY KEY AUTO_INCREMENT,
     business_id INT NOT NULL,
     platform VARCHAR(100) NOT NULL, 
@@ -42,14 +45,15 @@ CREATE TABLE platform_accounts.ecommerce_accounts (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (business_id) REFERENCES platform_accounts.businesses(id) ON DELETE CASCADE,
     UNIQUE KEY uq_account_platform_external (platform, external_account_id),
-    INDEX idx_business_id (business_id)
+    INDEX idx_business_id (business_id),
+    CONSTRAINT CHECK platform IN ('mercadolibre', 'tiendanube')
 );
 ```
+
 ```sql
 CREATE TABLE platform_accounts.credentials (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    ecommerce_account_id INT NOT NULL,
-    client_id VARCHAR(255) NULL,
+    account_id INT NOT NULL,
     client_secret VARCHAR(255) NULL,
     access_token TEXT NULL,
     refresh_token TEXT NULL,
@@ -58,8 +62,26 @@ CREATE TABLE platform_accounts.credentials (
     expires_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (ecommerce_account_id) REFERENCES platform_accounts.ecommerce_accounts(id) ON DELETE CASCADE,
-    UNIQUE KEY uq_credentials_account (ecommerce_account_id)
+    FOREIGN KEY (account_id) REFERENCES platform_accounts.accounts(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_credentials_account (account_id)
+);
+```
+
+```sql
+CREATE TABLE platform_accounts.events (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    account_id INT NOT NULL,
+    source VARCHAR(32) NOT NULL,     
+    event_type VARCHAR(64) NOT NULL,  
+    external_id VARCHAR(255) NOT NULL,
+    payload JSON NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'pending',  
+    attempts INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (account_id) REFERENCES platform_accounts.accounts(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_event_dedup (account_id, source, event_type, external_id),
+    INDEX idx_event_status_updated (status, updated_at)
 );
 ```
 
@@ -214,25 +236,7 @@ CREATE TABLE mercadolibre.orders (
 );
 ```
 
--- replaces the in-memory `memory` set: durable claim, works across N instances
-```sql
-CREATE TABLE platform_accounts.events (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    ecommerce_account_id INT NOT NULL,
-    source VARCHAR(32) NOT NULL,     
-    event_type VARCHAR(64) NOT NULL,  
-    external_id VARCHAR(255) NOT NULL,
-    payload JSON NULL,
-    status VARCHAR(16) NOT NULL DEFAULT 'pending',  
-    attempts INT NOT NULL DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (ecommerce_account_id) REFERENCES platform_accounts.ecommerce_accounts(id) ON DELETE CASCADE,
-    UNIQUE KEY uq_event_dedup (ecommerce_account_id, source, event_type, external_id),
-    INDEX idx_event_status_updated (status, updated_at)
-);
-```
+
 
 ```sql
 -- Bitcram double-post guard: one row per (order, product, direction)

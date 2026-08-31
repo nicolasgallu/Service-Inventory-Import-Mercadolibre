@@ -1,13 +1,11 @@
 from flask import Flask
-from app.api.publish_event import meli_publish
+from app.api.publish_event import publications
 from app.webhook.selling_event import meli_sell
-from app.api.calculate_cost import wh_calculation
 
 def create_app():
     app = Flask(__name__)
-    app.register_blueprint(meli_publish)
+    app.register_blueprint(publications)
     app.register_blueprint(meli_sell)
-    app.register_blueprint(wh_calculation)
     return app
 
 app = create_app()
