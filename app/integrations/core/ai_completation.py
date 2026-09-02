@@ -1,8 +1,8 @@
 import asyncio
 from app.utils.logger import logger
 from app.service.llm_api import call_deepseek_api
-from app.integrations.mercadolibre.meli_api import get_data_for_meli
-from app.settings.config import SCHEMA_INVENTORY, SCHEMA_AI, SCHEMA_MERCADOLIBRE
+from app.integrations.mercadolibre.product_handler import get_data_for_meli
+from app.settings.config import SCHEMA_INVENTORY, SCHEMA_AI
 from app.db.helpers import get_one, execute
 from sqlalchemy.exc import IntegrityError
 
@@ -12,11 +12,11 @@ ATTRIBUTES_TABLE= 'attributes'
 PRODUCT_LISTING_TABLE= 'product_listings'
 
 #crear prompts table en un lugar centralizado.
-#recordarfiltar por ecommerce_account_id ya que cada account tiene su criterio.
-
+#recordarfiltar por account_id ya que cada account tiene su criterio.
 #AVISARLE A LEA QUE EL CONTRATO DEL PAYLOAD PARA PROMPTS CAMBIO.
 #AHORA LOS CAMPOS SIGUEN VINIENDO EN DATA PERO EL NOMBRE DE MELI CAMBIO A name_edited.
 #RESOLVER SI ES QUE ME MANDA MAL ALGO..
+
 
 def _aux_get_ai_prompt():
     sql = (
@@ -49,37 +49,45 @@ def _update_products(product_id, data):
     execute(sql, params)
 
 
-def _insert_product_listing(product_id, ecommerce_account_id):
-
-    logger.info('running insert in listing table.')
-    sql = (
-        "INSERT INTO " + SCHEMA_MERCADOLIBRE + "." + PRODUCT_LISTING_TABLE
-        + " (product_id, ecommerce_account_id)"
-        + " VALUES (:product_id, :ecommerce_account_id)"
-    )
+def insert_product_listing(product_id, schema, account_id):
     try:
-        execute(sql, {'product_id': product_id, 'ecommerce_account_id': ecommerce_account_id})
-        logger.info("New listing created.")
-    except IntegrityError:
-        logger.info("Not new listing created. (already created)")
-        pass
-
-def _insert_attributes(product_listing_id):
-
-    logger.info('running insert in attributes.')
-    sql = (
-        "INSERT INTO " + SCHEMA_MERCADOLIBRE + "." + ATTRIBUTES_TABLE
-        + " (product_listing_id)"
-        + " VALUES (:product_listing_id)"
-    )
-    try:
-        execute(sql, {"product_listing_id": product_listing_id,})
-        logger.info("New Attribute created.")
-    except IntegrityError:
-        logger.info("Not new Attribute created. (already created)")
-        pass
-
-
+        # Try to insert product_listing (ignore if exists)
+        execute(
+            f"""
+            INSERT IGNORE INTO {schema}.{PRODUCT_LISTING_TABLE} 
+            (product_id, account_id) 
+            VALUES (:product_id, :account_id)
+            """,
+            {"product_id": product_id, "account_id": account_id}
+        )
+        
+        # Get the listing ID (always exists now)
+        result = get_one(
+            f"""SELECT id FROM {schema}.{PRODUCT_LISTING_TABLE} 
+             WHERE product_id = :product_id AND account_id = :account_id""",
+            {"product_id": product_id, "account_id": account_id}
+        )
+        listing_id = result['id']
+        
+        # Try to insert attributes (ignore if exists)
+        execute(
+            f"""
+            INSERT IGNORE INTO {schema}.{ATTRIBUTES_TABLE} 
+            (product_listing_id) 
+            VALUES (:listing_id)
+            """,
+            {"listing_id": listing_id}
+        )
+        
+        logger.info(f"Listing ensured for product {product_id} | schema: {schema} | id: {listing_id}")
+        return listing_id
+        
+    except IntegrityError as e:
+        logger.warning(f"Integrity error for product {product_id}: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Failed to create listing: {e}")
+        return None
 
 async def _call_ai(sys_prompt, user_prompt):
     return await asyncio.to_thread( call_deepseek_api, sys_prompt, user_prompt)
@@ -92,12 +100,13 @@ async def ai_call_prepublish(payload):
     ##SI EXISTE DATA PERO NO HAY PROMPT ROMPER.
     #if not prompt:return
     #user_prompt.get('prompt') and user_prompt.get('field'):
-
-    product_id = payload.get('product_id')
-    ecommerce_account_id = payload.get('ecommerce_account_id')
     user_prompt = payload.get('data')
+    
+    product_id = payload.get('product_id')
+    account_id = payload.get('account_id')
+    target = payload.get('target')
+    insert_product_listing(product_id, target, account_id)
 
-    _insert_product_listing(product_id, ecommerce_account_id)
     prompts = _aux_get_ai_prompt()
     item_data = get_data_for_meli(product_id)
     
@@ -106,7 +115,6 @@ async def ai_call_prepublish(payload):
     description = item_data.get('description')
     brand = item_data.get('brand')
     model = item_data.get('model')
-    product_listing_id = item_data.get('product_listing_id')
     
     if user_prompt:
         logger.info("Received a user prompt action")
@@ -176,5 +184,3 @@ async def ai_call_prepublish(payload):
     }
 
     _update_products(product_id, data)
-
-    _insert_attributes(product_listing_id)

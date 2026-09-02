@@ -1,7 +1,6 @@
 from urllib.parse import quote_plus
 from sqlalchemy import create_engine
 from app.settings.config import (
-    DB_PORT,
     INSTANCE_DB,
     NAME_DB,
     PASSWORD_DB,
@@ -35,8 +34,8 @@ def _build_engine():
         "mysql+pymysql://",
         creator=_cloud_sql_connection,
         pool_pre_ping=True,
-        pool_size=5,
-        max_overflow=2,
+        pool_size=8,
+        max_overflow=4,
     )
 
 engine = _build_engine()

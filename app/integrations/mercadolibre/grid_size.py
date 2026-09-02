@@ -1,20 +1,23 @@
 import json
-import uuid
 from unidecode import unidecode
+from app.db.helpers import execute, get_one
 import requests
 from app.utils.logger import logger
-from app.service.secrets import meli_secrets
-#from app.integrations.mercadolibre.meli_api import publish_item
-from app.db.database import get_method, upsert_method
+from app.integrations.core.credentials import get_access_token
+from app.integrations.mercadolibre.product_handler import get_data_for_meli, _update_record
 from app.settings.config import SCHEMA_MERCADOLIBRE, SCHEMA_INVENTORY
 
-PRODUCTS_TABLE = 'product_catalog_sync'
+PRODUCTS_TABLE = 'products'
+PRODUCT_LISTING_TABLE= 'product_listings'
 ATTRIBUTES_TABLE = 'attributes'
 GRID_TABLE = 'size_grid'
 SITE_ID = "MLA"
 
-def get_headers():
-    token = meli_secrets()
+
+
+def get_headers(payload):
+    account_id = payload.get('account_id')
+    token = get_access_token(account_id).get('access_token')
     return {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
@@ -37,48 +40,28 @@ def get_row_id(size_grid_id, size):
     return None
 
 
-def get_data_from_attributes(item_id):
-    """"""
-    logger.info(f"Getting data from: {ATTRIBUTES_TABLE} and {PRODUCTS_TABLE}")
-    query = {
-        'q_columns': [
-            'a.id',
-            'a.item_id',
-            'a.category_id',
-            'a.category_options',
-            'a.settings',
-            'b.brand'
-        ],
-        'q_from':f'FROM {SCHEMA_MERCADOLIBRE}.{ATTRIBUTES_TABLE} as a',
-        'q_join':[f'LEFT JOIN {SCHEMA_INVENTORY}.{PRODUCTS_TABLE} as b on a.item_id = b.id'],
-        'q_where': f'WHERE a.item_id = {item_id}',
-        'q_limit':'LIMIT 1'
-    }
-    item_data = get_method(query)
-    return item_data[0]
+def get_data_from_size_grid(product_id):
+    sql = (
+        "SELECT "
+        + "a.id, "
+        + "c.id, as size_grid_id"
+        + "c.settings "
+        + "FROM " + SCHEMA_MERCADOLIBRE + "." + PRODUCT_LISTING_TABLE + " AS a "
+        + "LEFT JOIN " + SCHEMA_MERCADOLIBRE + "." + ATTRIBUTES_TABLE + " AS b ON b.product_listing_id = a.id "
+        + "LEFT JOIN " + SCHEMA_MERCADOLIBRE + "." + ATTRIBUTES_TABLE + " AS c ON c.attribute_id = b.id "
+        + "WHERE a.product_id = :product_id "
+    )
+    row = get_one(sql, {"product_id": product_id,})
+    return row
 
 
-def get_data_from_size_grid(item_id):
-    """"""
-    logger.info(f"Getting data from: {GRID_TABLE}")
-    query = {
-        'q_columns': [
-            'a.id',
-            'a.settings'
-        ],
-        'q_from':f'FROM {SCHEMA_MERCADOLIBRE}.{GRID_TABLE} as a',
-        'q_where': f'WHERE a.item_id = {item_id}',
-        'q_limit':'LIMIT 1'
-    }
-    item_data = get_method(query)
-    return item_data[0]
 
-
-def get_base_data(item_id):
+def get_base_data(payload):
     """"""
     logger.info("Creating base data.")
-    base_info = get_data_from_attributes(item_id)
-    att_id = base_info['id']
+    product_id = payload.get('product_id')
+    base_info = get_data_for_meli(product_id)
+    attribute_id = base_info['attribute_id']
     category_id = base_info['category_id']
     brand = base_info['brand']
     category_options = json.loads(base_info['category_options'])
@@ -94,7 +77,7 @@ def get_base_data(item_id):
                 elif item["id"] == "SIZE":
                     size = item["user_input_value"]
 
-    return brand, domain_id, gender, settings, att_id, size
+    return brand, domain_id, gender, settings, attribute_id, size
 
 
 
@@ -133,9 +116,9 @@ def request_tech_spec(BRAND, DOMAIN_ID, GENDER):
     return required
 
 
-def create_template(item_id):
+def create_template(payload):
     """"""
-    BRAND, DOMAIN_ID, GENDER, *_  = get_base_data(item_id)
+    BRAND, DOMAIN_ID, GENDER, settings, attribute_id, size = get_base_data(payload)
     required = request_tech_spec(BRAND, DOMAIN_ID, GENDER)
 
     logger.info("Creating Template.")
@@ -205,24 +188,28 @@ def create_template(item_id):
                     })
 
     clean_json = unidecode(json.dumps(required_template, ensure_ascii=False).replace("'","").replace("\\n",""))
-    data = {
-        'id': {'value': str(uuid.uuid4()), 'type': 'CHAR'},
-        'item_id': {'value': 188133, 'type': 'SIGNED'},
-        'size_grid_id': {'value': None, 'type': 'SIGNED'},
-        'settings': {'value': clean_json, 'type': 'JSON'},
-        'response': {'value': None, 'type': 'CHAR'},
-    }
-    upsert_method(data, SCHEMA_MERCADOLIBRE, 'size_grid')
+
+    execute(
+            f"""
+            INSERT IGNORE INTO {SCHEMA_MERCADOLIBRE}.{GRID_TABLE} 
+            (attribute_id, size_grid_id, settings, response) 
+            VALUES (:attribute_id, :size_grid_id, :settings, :response)
+            """,
+            {'attribute_id':attribute_id, 'size_grid_id':None, 'settings':clean_json, 'response':None}
+        )
 
 
-def create_grid(item_id):
+
+def create_grid(payload):
     """"""
     logger.info("Creating Grid.")
-    BRAND, DOMAIN_ID, GENDER, SETTINGS, ATT_ID, SIZE = get_base_data(item_id)
+    BRAND, DOMAIN_ID, GENDER, SETTINGS, attribute_id, SIZE = get_base_data(payload)
 
-    data = get_data_from_size_grid(item_id)
+    product_id = payload.get('product_id')
+
+    data = get_data_from_size_grid(product_id)
     attributes = json.loads(data['settings'])
-    size_grid_id = data['id']
+    size_grid_id = data['size_grid_id']
 
     rows_by_size = {}
 
@@ -294,16 +281,9 @@ def create_grid(item_id):
     try:
         response.raise_for_status()
         size_grid_id = response.json()['id']
-        data = {
-            'id': {'value': size_grid_id, 'type': 'CHAR'},
-            'item_id': {'value': item_id, 'type': 'SIGNED'},
-            'size_grid_id': {'value': size_grid_id, 'type': 'SIGNED'},
-            'response': {'value': 'success', 'type': 'CHAR'},
-        }
-
+        data = {'response': 'Done.'}
 
         row_id = get_row_id(size_grid_id, SIZE)
-
         for section in SETTINGS:
             for items in section.values():
                 for item in items:
@@ -313,19 +293,12 @@ def create_grid(item_id):
                         item["user_input_value"] = row_id
                         
         clean_json = unidecode(json.dumps(SETTINGS, ensure_ascii=False).replace("'","").replace("\\n",""))
-        new_settings = {
-            'id': {'value': ATT_ID, 'type': 'CHAR'},
-            'settings': {'value': clean_json, 'type': 'JSON'},
-        }
-        upsert_method(new_settings, SCHEMA_MERCADOLIBRE, ATTRIBUTES_TABLE)
-        #publish_item(item_id, meli_secrets())
+        new_settings = {'settings': clean_json,}
+        _update_record(attribute_id, new_settings, ATTRIBUTES_TABLE)
   
     except requests.HTTPError:
         clean_json = unidecode(json.dumps(response.json(), 
                                           ensure_ascii=False).replace("'","").replace("\\n",""))
-        data = {
-            'id': {'value': size_grid_id, 'type': 'CHAR'},
-            'item_id': {'value': item_id, 'type': 'SIGNED'},
-            'response': {'value': clean_json, 'type': 'CHAR'},
-        }
-    upsert_method(data, SCHEMA_MERCADOLIBRE, GRID_TABLE)
+        data = {'response': clean_json}
+
+    _update_record(size_grid_id, data, GRID_TABLE)

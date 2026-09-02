@@ -1,7 +1,6 @@
-who is my tenant? my tenant is ecommerce_account.
-why? because a business can have multiples accounts from the same platform e.g mercadolibre.
-so if the user is publishing the same product in different accounts, and the tenant is bussines
-it would create a leak between tenants.
+Tenant model: business is the owner of the data, while ecommerce_account identifies the specific platform account. 
+A business can have multiple accounts on the same platform, but a product is published only once per platform. 
+Therefore, account-level data must always be scoped by account_id to prevent cross-account data leaks.
 
 -- ============================================================
 -- SCHEMAS
@@ -11,10 +10,35 @@ it would create a leak between tenants.
 -- DROP SCHEMA inventory;
 -- DROP SCHEMA mercadolibre;
 
+SET FOREIGN_KEY_CHECKS = 0;
+
+DROP TABLE IF EXISTS
+    tiendanube.orders,
+    tiendanube.categories,
+    tiendanube.attributes,
+    tiendanube.variation_listings,
+    tiendanube.product_listings,
+    mercadolibre.orders,
+    mercadolibre.size_grid,
+    mercadolibre.attributes,
+    mercadolibre.variation_listings,
+    mercadolibre.product_listings,
+    inventory.stock_movements,
+    inventory.product_images,
+    inventory.product_variations,
+    inventory.products,
+    platform_accounts.events,
+    platform_accounts.credentials,
+    platform_accounts.accounts,
+    platform_accounts.businesses;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
 ```sql
 CREATE SCHEMA IF NOT EXISTS platform_accounts;
 CREATE SCHEMA IF NOT EXISTS inventory;
 CREATE SCHEMA IF NOT EXISTS mercadolibre;
+CREATE SCHEMA IF NOT EXISTS tiendanube;
 ```
 
 -- ============================================================
@@ -27,6 +51,8 @@ CREATE TABLE platform_accounts.businesses (
     email VARCHAR(255) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     full_name VARCHAR(255) NOT NULL,
+    config json,
+    webhook_secret VARCHAR(64) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -46,7 +72,8 @@ CREATE TABLE platform_accounts.accounts (
     FOREIGN KEY (business_id) REFERENCES platform_accounts.businesses(id) ON DELETE CASCADE,
     UNIQUE KEY uq_account_platform_external (platform, external_account_id),
     INDEX idx_business_id (business_id),
-    CONSTRAINT CHECK platform IN ('mercadolibre', 'tiendanube')
+    CONSTRAINT chk_platform CHECK (platform IN ('mercadolibre', 'tiendanube'))
+
 );
 ```
 
@@ -54,6 +81,7 @@ CREATE TABLE platform_accounts.accounts (
 CREATE TABLE platform_accounts.credentials (
     id INT PRIMARY KEY AUTO_INCREMENT,
     account_id INT NOT NULL,
+    client_id VARCHAR(255) NULL,
     client_secret VARCHAR(255) NULL,
     access_token TEXT NULL,
     refresh_token TEXT NULL,
@@ -80,8 +108,7 @@ CREATE TABLE platform_accounts.events (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (account_id) REFERENCES platform_accounts.accounts(id) ON DELETE CASCADE,
-    UNIQUE KEY uq_event_dedup (account_id, source, event_type, external_id),
-    INDEX idx_event_status_updated (status, updated_at)
+    UNIQUE KEY uq_event_dedup (account_id, source, event_type, external_id)
 );
 ```
 
@@ -91,16 +118,20 @@ CREATE TABLE platform_accounts.events (
 #para llevar estos cambios a inventario,
 la logica de lectura de product code de Emi
 tiene que viajar a algun lado, capaz sql puro.
+
+Esta tabla es granular a nivel de internal_code - negocio.
+Entonces si resulta que el usuario tiene varios negocios con los mismos internal code, pueden existir aqui sin problema.
 ```sql
 CREATE TABLE inventory.products (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    ecommerce_account_id INT NOT NULL,
+    business_id INT NOT NULL,
     internal_code VARCHAR(255),
     sku VARCHAR(255),
     gtin VARCHAR(255),
     name VARCHAR(255) NOT NULL,
     name_edited VARCHAR(255) NULL,
     description TEXT,
+    category VARCHAR(255),
     brand VARCHAR(255),
     model VARCHAR(255),
     price DECIMAL(10,2) DEFAULT 0,
@@ -110,9 +141,11 @@ CREATE TABLE inventory.products (
     drive_url TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (ecommerce_account_id) REFERENCES platform_accounts.ecommerce_accounts(id) ON DELETE CASCADE,
-    UNIQUE KEY uq_account_internal_code (ecommerce_account_id, internal_code),
-    INDEX idx_ecommerce_account_id (ecommerce_account_id)
+    FOREIGN KEY (business_id) REFERENCES platform_accounts.businesses(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_business_internal_code (business_id, internal_code),
+    UNIQUE KEY uq_business_sku (business_id, sku),
+    UNIQUE KEY uq_business_gtin (business_id, gtin),
+    INDEX  idx_business_id (business_id)
 );
 ```
 
@@ -141,7 +174,33 @@ CREATE TABLE inventory.product_variations (
     FOREIGN KEY (product_id) REFERENCES inventory.products(id) ON DELETE CASCADE,
     INDEX idx_product_id (product_id)
 );
+``` 
+
+-- double-post guard: one row per (order, product, direction)
+```sql
+CREATE TABLE inventory.stock_movements (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    account_id INT NOT NULL,
+    order_id VARCHAR(255) NOT NULL,
+    product_id INT NOT NULL,
+    direction VARCHAR(8) NOT NULL,  
+    quantity INT NOT NULL,
+    unit_price DECIMAL(12,2) NULL,
+    target_system VARCHAR(30) NULL,
+    provider_doc_id VARCHAR(255) NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'attempting', 
+    error_message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (account_id) REFERENCES platform_accounts.accounts(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_stock_dedup (account_id, order_id, product_id, direction),
+    CONSTRAINT chk_target_system CHECK (target_system IN ('bitcram'))    
+    
+);
 ```
+
+
 
 
 
@@ -153,7 +212,7 @@ CREATE TABLE inventory.product_variations (
 CREATE TABLE mercadolibre.product_listings (
     id INT PRIMARY KEY AUTO_INCREMENT,
     product_id INT NOT NULL,
-    ecommerce_account_id INT NOT NULL,
+    account_id INT NOT NULL,
     meli_id VARCHAR(50) NULL,
     price INT NULL,
     price_manually_changed BOOLEAN NULL,
@@ -165,9 +224,9 @@ CREATE TABLE mercadolibre.product_listings (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES inventory.products(id) ON DELETE CASCADE,
-    FOREIGN KEY (ecommerce_account_id) REFERENCES platform_accounts.ecommerce_accounts(id) ON DELETE CASCADE,
+    FOREIGN KEY (account_id) REFERENCES platform_accounts.accounts(id) ON DELETE CASCADE,
     UNIQUE KEY uq_listing_product (product_id),
-    UNIQUE KEY uq_listing_meli_id (meli_id)  
+    UNIQUE KEY uq_listing_meli_id (account_id, meli_id)  
 );
 ```
 
@@ -176,7 +235,7 @@ CREATE TABLE mercadolibre.variation_listings (
     id INT PRIMARY KEY AUTO_INCREMENT,
     product_variation_id INT NOT NULL,
     product_listing_id INT NOT NULL,
-    external_variation_id VARCHAR(255) NOT NULL,
+    meli_id VARCHAR(50) NULL,
     price DECIMAL(10,2) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -225,37 +284,151 @@ CREATE TABLE mercadolibre.size_grid (
 CREATE TABLE mercadolibre.orders (
     id INT PRIMARY KEY AUTO_INCREMENT,
     order_id VARCHAR(255) NOT NULL,
-    ecommerce_account_id INT NOT NULL,
+    account_id INT NOT NULL,
     status VARCHAR(50) NULL,
     data JSON DEFAULT NULL,
     pack_id VARCHAR(255) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (ecommerce_account_id) REFERENCES platform_accounts.ecommerce_accounts(id) ON DELETE CASCADE,
-    UNIQUE KEY uq_order_account (ecommerce_account_id, order_id)
+    FOREIGN KEY (account_id) REFERENCES platform_accounts.accounts(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_order_account (account_id, order_id)
 );
 ```
 
+-- ============================================================
+-- SCHEMA: tiendanube
+-- ============================================================
 
 
 ```sql
--- Bitcram double-post guard: one row per (order, product, direction)
-CREATE TABLE inventory.stock_movements (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    ecommerce_account_id INT NOT NULL,
-    order_id VARCHAR(255) NOT NULL,
+CREATE TABLE tiendanube.product_listings (
+    id INT PRIMARY KEY AUTO_INCREMENT,
     product_id INT NOT NULL,
-    direction VARCHAR(8) NOT NULL,  
-    quantity INT NOT NULL,
-    unit_price DECIMAL(12,2) NULL,
-    provider_doc_id VARCHAR(255) NULL,
-    status VARCHAR(16) NOT NULL DEFAULT 'attempting', 
+    account_id INT NOT NULL,
+    tnube_id INT NULL,
+    variant_id INT NULL,
+    price INT NULL,
+    price_manually_changed BOOLEAN NULL,
+    price_updated_at TIMESTAMP NULL,
+    status VARCHAR(100) NULL,
+    reason TEXT NULL,
+    remedy VARCHAR(255) NULL,
+    permalink TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (ecommerce_account_id) REFERENCES platform_accounts.ecommerce_accounts(id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-    UNIQUE KEY uq_stock_dedup (ecommerce_account_id, order_id, product_id, direction)
+    FOREIGN KEY (product_id) REFERENCES inventory.products(id) ON DELETE CASCADE,
+    FOREIGN KEY (account_id) REFERENCES platform_accounts.accounts(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_listing_product (product_id),
+    UNIQUE KEY uq_listing_meli_id (account_id, tnube_id)  
+);
+```
+
+```sql
+CREATE TABLE tiendanube.variation_listings (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    product_variation_id INT NOT NULL,
+    product_listing_id INT NOT NULL,
+    variant_id INT NULL,
+    price DECIMAL(10,2) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_variation_id) REFERENCES inventory.product_variations(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_listing_id) REFERENCES tiendanube.product_listings(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_product_variation_listing (product_variation_id, product_listing_id),
+    INDEX idx_product_listing_id (product_listing_id),
+    INDEX idx_product_variation_id (product_variation_id)
 );
 ```
 
 
+```sql
+CREATE TABLE tiendanube.attributes (
+
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    product_listing_id INT NOT NULL,
+    category_id INT NULL,
+    settings JSON DEFAULT (
+        '{
+            "SEO_TITLE": {
+                "DEFAULT_VALUE": null,
+                "USER_INPUT_VALUE": null
+            },
+            "SEO_DESCRIPTION": {
+                "DEFAULT_VALUE": null,
+                "USER_INPUT_VALUE": null
+            },
+            "BARCODE": {
+                "DEFAULT_VALUE": null,
+                "USER_INPUT_VALUE": null
+            },
+            "VIDEO_URL": {
+                "DEFAULT_VALUE": null,
+                "USER_INPUT_VALUE": null
+            },
+            "TAGS": {
+                "DEFAULT_VALUE": [null],
+                "USER_INPUT_VALUE": null
+            },
+            "PROMOTIONAL_PRICE": {
+                "DEFAULT_VALUE": null,
+                "USER_INPUT_VALUE": null
+            },
+            "MPN": {
+                "DEFAULT_VALUE": null,
+                "USER_INPUT_VALUE": null
+            },
+            "AGE_GROUP": {
+                "DEFAULT_VALUE": null,
+                "USER_INPUT_VALUE": null
+            },
+            "GENDER": {
+                "DEFAULT_VALUE": null,
+                "USER_INPUT_VALUE": null
+            },
+            "FREE_SHIPPING": {
+                "DEFAULT_VALUE": null,
+                "USER_INPUT_VALUE": null
+            }
+        }'
+    ),
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_listing_id) REFERENCES tiendanube.product_listings(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_attributes_listing (product_listing_id)
+
+);
+```
+
+
+```sql
+CREATE TABLE tiendanube.categories (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    account_id INT NOT NULL,
+    external_category_id INT NOT NULL,
+    name VARCHAR(255),
+    data JSON,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (account_id) REFERENCES platform_accounts.accounts(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_account_external_category (account_id, external_category_id)
+);
+```
+
+    
+
+
+```sql
+CREATE TABLE tiendanube.orders (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    order_id VARCHAR(255) NOT NULL,
+    account_id INT NOT NULL,
+    status VARCHAR(50) NULL,
+    data JSON DEFAULT NULL,
+    pack_id VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (account_id) REFERENCES platform_accounts.accounts(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_order_account (account_id, order_id)
+);
+```

@@ -1,3 +1,4 @@
+#REEMPLAZAR CON SISTEMA PROPIO Y BUCKET, NO SEGUIR USANDO  LA API DEBIDO A LO OVERCOMPLEX.
 import os
 import io
 import json
@@ -10,10 +11,9 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from google.oauth2 import credentials
 from google.auth.transport.requests import Request
-
 from app.settings.config import PROJECT_ID
-from app.db.database import get_item_data
-from app.service.secrets import meli_secrets
+from app.integrations.mercadolibre.product_handler import get_data_for_meli
+from app.integrations.core.credentials import get_access_token
 from app.utils.logger import logger
 
 # --- CONFIGURATION ---
@@ -64,7 +64,8 @@ def get_drive_creds_from_secret():
                     logger.info(f"🗑️ Destroyed old secret version: {version.name}")
     return drive_creds
 
-def mvp_meli_pictures(item_id):
+
+def mvp_meli_pictures(payload):
     """
     Entry point for the Cloud Function.
     Now uses a direct folder URL instead of searching by name.
@@ -72,9 +73,14 @@ def mvp_meli_pictures(item_id):
     logger.info("executing mvp meli pictures job")
     try:
         # 1. Get Folder ID directly from the provided URL
-        meli_id = get_item_data(item_id).get('meli_id')
-        folder_url = get_item_data(item_id).get('drive_url')        
-        token = meli_secrets()
+        product_id = payload.get('product_id')
+        account_id = payload.get('account_id')
+        token = get_access_token(account_id).get('access_token')
+        product_data = get_data_for_meli(product_id)
+
+        meli_id = product_data.get('meli_id')
+        iternal_code = product_data.get('iternal_code')
+        folder_url = product_data.get('drive_url')        
 
         folder_id = extract_id_from_url(folder_url)
         if not folder_id:
@@ -132,7 +138,7 @@ def mvp_meli_pictures(item_id):
                     png_buffer.seek(0)
 
                     file_meta = {
-                        'name': f"{item_id}_{idx}.png", 
+                        'name': f"{iternal_code}_{idx}.png", 
                         'parents': [folder_id]
                     }
                     media = MediaIoBaseUpload(png_buffer, mimetype='image/png')

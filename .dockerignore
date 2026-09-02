@@ -1,0 +1,22 @@
+# secrets & local config — inject via Cloud Run env / Secret Manager instead
+.env
+.env.test
+service_account.json
+
+# docs & review artifacts (new_tables_input.md holds real credentials!)
+*.md
+review/
+
+# dev artifacts
+tests/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# local venv (467MB of broken symlinks)
+venv-srvice-inventory-ecommerce/
+venv/
+
+# misc
+.git/
+.gitignore

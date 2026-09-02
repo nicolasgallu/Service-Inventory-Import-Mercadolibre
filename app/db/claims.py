@@ -1,5 +1,4 @@
 import json
-from datetime import datetime, timedelta
 from sqlalchemy.exc import IntegrityError
 from app.db.helpers import execute, get_one
 from app.settings.config import SCHEMA_ACCOUNTS
@@ -40,7 +39,7 @@ def heartbeat(event_id):
 def _insert_pending(account_id, source, event_type, external_id, payload):
     sql = (
         "INSERT INTO " + EVENTS_TABLE
-        + " (ecommerce_account_id, source, event_type, external_id, payload, status)"
+        + " (account_id, source, event_type, external_id, payload, status)"
         + " VALUES (:account_id, :source, :event_type, :external_id, :payload, 'pending')"
     )
     try:
@@ -58,17 +57,17 @@ def _insert_pending(account_id, source, event_type, external_id, payload):
 
 
 def _try_claim(account_id, source, event_type, external_id):
-    stale_before = datetime.now() - timedelta(seconds=RECLAIM_AFTER_SECONDS)
     sql = (
         "UPDATE " + EVENTS_TABLE
         + " SET status = 'processing', updated_at = NOW(), attempts = attempts + 1"
-        + " WHERE ecommerce_account_id = :account_id"
+        + " WHERE account_id = :account_id"
         + " AND source = :source"
         + " AND event_type = :event_type"
         + " AND external_id = :external_id"
         + " AND ("
         + "     status = 'pending'"
-        + "     OR (status = 'processing' AND updated_at < :stale_before)"
+        + "     OR (status = 'processing' AND updated_at < NOW() - INTERVAL "
+        + str(RECLAIM_AFTER_SECONDS) + " SECOND)"
         + "     OR (status = 'failed' AND attempts < :max_attempts)"
         + " )"
     )
@@ -77,7 +76,6 @@ def _try_claim(account_id, source, event_type, external_id):
         "source": source,
         "event_type": event_type,
         "external_id": external_id,
-        "stale_before": stale_before,
         "max_attempts": MAX_ATTEMPTS,
     })
     if rowcount == 1:
@@ -88,7 +86,7 @@ def _try_claim(account_id, source, event_type, external_id):
 def _event_id(account_id, source, event_type, external_id):
     sql = (
         "SELECT id FROM " + EVENTS_TABLE
-        + " WHERE ecommerce_account_id = :account_id"
+        + " WHERE account_id = :account_id"
         + " AND source = :source"
         + " AND event_type = :event_type"
         + " AND external_id = :external_id"

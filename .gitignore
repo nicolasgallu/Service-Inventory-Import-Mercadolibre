@@ -7,3 +7,7 @@ __pycache__/
 *$py.class
 *.so
 .env.test
+new_tables_input.md
+tests/
+.venv
+legacy/
