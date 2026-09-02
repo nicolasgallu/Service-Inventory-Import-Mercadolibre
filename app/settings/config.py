@@ -3,16 +3,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 PROJECT_ID=os.getenv("PROJECT_ID")
-SECRET_GUIAS=os.getenv("SECRET_GUIAS")
 
 DS_API_KEY=os.getenv("DS_API_KEY")
-
 TOKEN_WHAPI=os.getenv("TOKEN_WHAPI")
 PHONE_INTERNAL=os.getenv("PHONE_INTERNAL")
-PHONE_CUSTOMER=os.getenv("PHONE_CUSTOMER")
-
-ID_CARPETA_MADRE=os.getenv("ID_CARPETA_MADRE")
-BUCKET_NAME=os.getenv("BUCKET_NAME")
 
 BASE_URL=os.getenv("BASE_URL")
 CHECKOUT_NUMBER=os.getenv("CHECKOUT_NUMBER")
@@ -31,4 +25,3 @@ INSTANCE_DB = os.getenv("INSTANCE_DB")  # Cloud SQL instance connection name
 USER_DB = os.getenv("USER_DB")
 PASSWORD_DB = os.getenv("PASSWORD_DB")
 NAME_DB = os.getenv("NAME_DB")
-DB_PORT = os.getenv("DB_PORT", "3306")
