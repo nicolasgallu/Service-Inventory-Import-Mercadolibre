@@ -8,9 +8,6 @@ DS_API_KEY=os.getenv("DS_API_KEY")
 TOKEN_WHAPI=os.getenv("TOKEN_WHAPI")
 PHONE_INTERNAL=os.getenv("PHONE_INTERNAL")
 
-BASE_URL=os.getenv("BASE_URL")
-CHECKOUT_NUMBER=os.getenv("CHECKOUT_NUMBER")
-
 ### NEW VARIABLES
 
 # DB Schema
