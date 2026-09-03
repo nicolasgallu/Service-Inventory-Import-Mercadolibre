@@ -222,6 +222,33 @@ CREATE TABLE mercadolibre.product_listings (
 ```
 
 ```sql
+CREATE TABLE mercadolibre.selling_costs (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    product_listing_id INT NOT NULL,
+    price DECIMAL(12,2) NOT NULL,
+    sale_fee_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    sale_fixed_fee DECIMAL(12,2) NOT NULL DEFAULT 0,
+    financing_add_on_fee DECIMAL(6,2) NOT NULL DEFAULT 0,
+    meli_percentage_fee DECIMAL(6,2) NOT NULL DEFAULT 0,
+    percentage_fee DECIMAL(6,2) NOT NULL DEFAULT 0,
+    gross_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    listing_fixed_fee DECIMAL(12,2) NOT NULL DEFAULT 0,
+    listing_gross_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    fee_tax DECIMAL(6,2) NOT NULL DEFAULT 0,
+    ship_list_cost DECIMAL(12,2) NOT NULL DEFAULT 0,
+    ship_discount_rate DECIMAL(6,2) NOT NULL DEFAULT 0,
+    ship_promoted_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    total_selling_cost DECIMAL(12,2) NOT NULL DEFAULT 0,
+    total_selling_cost_with_tax DECIMAL(12,2) NOT NULL DEFAULT 0,
+    api_payload JSON NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_listing_id) REFERENCES mercadolibre.product_listings(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_costs_listing (product_listing_id)
+);
+```
+
+```sql
 CREATE TABLE mercadolibre.variation_listings (
     id INT PRIMARY KEY AUTO_INCREMENT,
     product_variation_id INT NOT NULL,
