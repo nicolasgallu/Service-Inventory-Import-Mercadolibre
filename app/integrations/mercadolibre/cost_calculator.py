@@ -1,6 +1,8 @@
+# app/integrations/mercadolibre/cost_calculator.py
 import json
 import requests
 from sqlalchemy import text
+
 from app.utils.logger import logger
 from app.settings.config import SCHEMA_MERCADOLIBRE
 from app.integrations.core.credentials import get_access_token
@@ -10,10 +12,16 @@ from app.db.engine import engine
 MELI_API = "https://api.mercadolibre.com"
 COSTS_TABLE = f"{SCHEMA_MERCADOLIBRE}.selling_costs"
 DEFAULT_DIMENSIONS = "30x30x30,1000"  # LxWxH,peso_en_gramos
+DEFAULT_FEE_TAX = 21                  # IVA sobre comisiones en Argentina
 
 
 def _flatten_settings(settings_json):
-    """attributes.settings (JSON) -> {VARIABLE_ID: user_input_value}."""
+    """attributes.settings (JSON) -> {VARIABLE_ID: user_input_value}.
+
+    El settings es una lista de grupos por sección:
+      [{"attributes": [...]}, {"shipping": [...]}, {"sale_terms": [...]}, {"listing": [...]}]
+    De cada variable solo nos interesa su user_input_value.
+    """
     values = {}
     for group in json.loads(settings_json or "[]"):
         for variables in group.values():
@@ -32,6 +40,11 @@ def _weight_from_dimensions(dimensions):
         return int(str(dimensions).split(",")[-1])
     except (ValueError, IndexError):
         return 1000
+
+
+def _without_none(params):
+    """La API devuelve cotizaciones vacías (todo en 0) si recibe params con None."""
+    return {k: v for k, v in params.items() if v is not None}
 
 
 def _meli_get(path, token, params=None):
@@ -73,7 +86,7 @@ def calculate_cost(payload):
     free_shipping = _to_bool(settings.get("FREE_SHIPPING"))
 
     # ---- 1. Comisión por venta --------------------------------------------
-    fee_data = _meli_get("/sites/MLA/listing_prices", token, {
+    fee_params = _without_none({
         "category_id": category_id,
         "price": price,
         "cy_id": currency_id,
@@ -82,13 +95,15 @@ def calculate_cost(payload):
         "listing_type_id": listing_type,
         "billable_weight": _weight_from_dimensions(dimensions),
     })
+    fee_data = _meli_get("/sites/MLA/listing_prices", token, fee_params)
     sale_fee = fee_data.get("sale_fee_details", {})
     listing_fee = fee_data.get("listing_fee_details", {})
-    fee_tax = fee_data.get("fee_tax", 0)  # IVA sobre comisiones (21 en AR)
+    # Si la API no informa fee_tax (o informa 0), usamos 21% (IVA en Argentina)
+    fee_tax = fee_data.get("fee_tax") or DEFAULT_FEE_TAX
 
     # ---- 2. Costo de envío --------------------------------------------------
     user_id = _meli_get("/users/me", token).get("id")
-    ship_data = _meli_get(f"/users/{user_id}/shipping_options/free", token, {
+    ship_params = _without_none({
         "dimensions": dimensions,
         "verbose": "true",
         "item_price": price,
@@ -99,6 +114,7 @@ def calculate_cost(payload):
         "logistic_type": logistic_type,
         "free_shipping": str(free_shipping).lower(),
     })
+    ship_data = _meli_get(f"/users/{user_id}/shipping_options/free", token, ship_params)
     country = ship_data.get("coverage", {}).get("all_country", {})
     discount = country.get("discount", {})
 
@@ -136,7 +152,7 @@ def _save_cost(product_listing_id, price, cost, fee_data, ship_data):
         "shipping_options": ship_data,
     })
     row = {
-        "listing_id": product_listing_id,
+        "product_listing_id": product_listing_id,   # ← columna correcta de la tabla
         "price": price,
         "api_payload": api_payload,
         **cost,
@@ -146,8 +162,8 @@ def _save_cost(product_listing_id, price, cost, fee_data, ship_data):
 
     with engine.begin() as conn:
         conn.execute(
-            text(f"DELETE FROM {COSTS_TABLE} WHERE product_listing_id = :listing_id"),
-            {"listing_id": product_listing_id},
+            text(f"DELETE FROM {COSTS_TABLE} WHERE product_listing_id = :product_listing_id"),
+            {"product_listing_id": product_listing_id},
         )
         conn.execute(
             text(f"INSERT INTO {COSTS_TABLE} ({columns}) VALUES ({params})"),
