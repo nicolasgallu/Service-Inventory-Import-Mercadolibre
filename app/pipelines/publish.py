@@ -46,6 +46,7 @@ def pipeline_publish(payload):
 
     elif event_type == "create_template":
         create_template(payload)
+        tnube_update(payload)
         
     elif event_type == "create_size_grid":
         create_grid(payload)
