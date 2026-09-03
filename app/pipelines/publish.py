@@ -3,7 +3,7 @@ from app.integrations.core.ai_completation import ai_call_prepublish
 from app.integrations.mercadolibre.grid_size import create_template, create_grid
 from app.integrations.mercadolibre.product_handler import prepublish, publish as meli_publish, update as meli_update, pause as meli_pause, delete as meli_delete
 from app.integrations.tiendanube.product_handler import create_categories, publish as tnube_publish, update as tnube_update, delete as tnube_delete
-from app.integrations.mercadolibre.ai_images import mvp_meli_pictures
+from app.integrations.mercadolibre.ai_images import meli_ai_pictures
 from app.utils.logger import logger
 
 def pipeline_publish(payload):
@@ -42,7 +42,7 @@ def pipeline_publish(payload):
             tnube_delete(payload)
 
     elif event_type == 'meli_pictures':
-        mvp_meli_pictures(payload)
+        meli_ai_pictures(payload)
 
     elif event_type == "create_template":
         create_template(payload)

@@ -11,3 +11,7 @@ new_tables_input.md
 tests/
 .venv
 legacy/
+db_helper/
+insert_db.py
+setup_db.py
+new_tables.md

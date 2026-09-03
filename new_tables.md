@@ -1,7 +1,3 @@
-Tenant model: business is the owner of the data, while ecommerce_account identifies the specific platform account. 
-A business can have multiple accounts on the same platform, but a product is published only once per platform. 
-Therefore, account-level data must always be scoped by account_id to prevent cross-account data leaks.
-
 -- ============================================================
 -- SCHEMAS
 -- ============================================================
@@ -58,8 +54,7 @@ CREATE TABLE platform_accounts.businesses (
 );
 ```
 
---The external_account_id is ecommerce agnostic.
---For meli the user_id and for tiendanube the store_id. 
+
 ```sql
 CREATE TABLE platform_accounts.accounts (
     id INT PRIMARY KEY AUTO_INCREMENT,
@@ -115,12 +110,8 @@ CREATE TABLE platform_accounts.events (
 -- ============================================================
 -- SCHEMA: inventory
 -- ============================================================
-#para llevar estos cambios a inventario,
-la logica de lectura de product code de Emi
-tiene que viajar a algun lado, capaz sql puro.
 
-Esta tabla es granular a nivel de internal_code - negocio.
-Entonces si resulta que el usuario tiene varios negocios con los mismos internal code, pueden existir aqui sin problema.
+
 ```sql
 CREATE TABLE inventory.products (
     id INT PRIMARY KEY AUTO_INCREMENT,

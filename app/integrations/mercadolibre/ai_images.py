@@ -1,155 +1,100 @@
-#REEMPLAZAR CON SISTEMA PROPIO Y BUCKET, NO SEGUIR USANDO  LA API DEBIDO A LO OVERCOMPLEX.
-import os
+# Syncs a product's MeLi pictures into GCS and stores their public URLs in the DB.
 import io
-import json
-import re
 import requests
-import google.auth
 from PIL import Image
-from google.cloud import secretmanager
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
-from google.oauth2 import credentials
-from google.auth.transport.requests import Request
-from app.settings.config import PROJECT_ID
+from google.cloud import storage
+from sqlalchemy import text
+from app.settings.config import SCHEMA_INVENTORY
 from app.integrations.mercadolibre.product_handler import get_data_for_meli
 from app.integrations.core.credentials import get_access_token
+from app.db.engine import engine
 from app.utils.logger import logger
 
 # --- CONFIGURATION ---
-SECRET_ID = "secrets--guiaslocales-api"
-SCOPES_DRIVE = ['https://www.googleapis.com/auth/drive']
+BUCKET_NAME = "pictures_ecommerce_guiaslocales"  # must be publicly readable (see notes below)
+MAX_PICTURES = 10                   # max images stored per product
+IMAGES_TABLE = f"{SCHEMA_INVENTORY}.product_images"
 
-def extract_id_from_url(url):
-    """
-    Extracts the Google Drive folder ID from a URL.
-    Handles standard /folders/ID format and ?id=ID format.
-    """
-    match = re.search(r"(?:folders/|id=)([a-zA-Z0-9-_]{25,})", url)
-    return match.group(1) if match else None
 
-def get_drive_creds_from_secret():
-    adc_creds, _ = google.auth.default()
-    client = secretmanager.SecretManagerServiceClient(credentials=adc_creds)
-    
-    secret_path = f"projects/{PROJECT_ID}/secrets/{SECRET_ID}/versions/latest"
-    parent = f"projects/{PROJECT_ID}/secrets/{SECRET_ID}"
-    
-    response = client.access_secret_version(request={"name": secret_path})
-    # Get the actual version number of the current 'latest' (e.g., .../versions/5)
-    current_version_name = response.name 
-    
-    creds_dict = json.loads(response.payload.data.decode("UTF-8"))
-    drive_creds = credentials.Credentials.from_authorized_user_info(creds_dict, SCOPES_DRIVE)
-    
-    if not drive_creds or not drive_creds.valid:
-        if drive_creds and drive_creds.expired and drive_creds.refresh_token:
-            logger.info("🔄 Refreshing Drive Access Token...")
-            drive_creds.refresh(Request())
-            
-            # 1. Add the new secret version
-            new_creds_dict = json.loads(drive_creds.to_json())
-            payload = json.dumps(new_creds_dict).encode("UTF-8")
-            new_version = client.add_secret_version(
-                request={"parent": parent, "payload": {"data": payload}}
+def _download_as_png(url):
+    """Download one image and convert it to PNG, all in memory (no disk I/O)."""
+    resp = requests.get(url, timeout=30)
+    resp.raise_for_status()
+    buffer = io.BytesIO()
+    with Image.open(io.BytesIO(resp.content)) as img:
+        img.save(buffer, format="PNG")
+    buffer.seek(0)
+    return buffer
+
+
+def _save_product_images(product_id, urls):
+    """Replace the product's image rows with the new URLs in one transaction."""
+    with engine.begin() as conn:
+        conn.execute(
+            text(f"DELETE FROM {IMAGES_TABLE} WHERE product_id = :product_id"),
+            {"product_id": product_id},
+        )
+        if urls:
+            conn.execute(
+                text(f"INSERT INTO {IMAGES_TABLE} (product_id, url) VALUES (:product_id, :url)"),
+                [{"product_id": product_id, "url": url} for url in urls],
             )
-            logger.info(f"✅ New version created: {new_version.name}")
-
-            # 2. Destroy ALL previous versions to keep only the new one
-            # This iterates through all versions and destroys any that aren't the one we just made
-            for version in client.list_secret_versions(request={"parent": parent}):
-                # Don't destroy the one we just created!
-                if version.name != new_version.name and version.state != secretmanager.SecretVersion.State.DESTROYED:
-                    client.destroy_secret_version(request={"name": version.name})
-                    logger.info(f"🗑️ Destroyed old secret version: {version.name}")
-    return drive_creds
 
 
-def mvp_meli_pictures(payload):
+def meli_ai_pictures(payload):
     """
     Entry point for the Cloud Function.
-    Now uses a direct folder URL instead of searching by name.
+    1. Fetch up to MAX_PICTURES pictures from the product's MeLi item.
+    2. Upload them to GCS: {BUCKET_NAME}/{product_id}/1.png ... N.png
+    3. Replace the product_images DB rows with the new public URLs.
     """
     logger.info("executing mvp meli pictures job")
+
     try:
-        # 1. Get Folder ID directly from the provided URL
-        product_id = payload.get('product_id')
-        account_id = payload.get('account_id')
-        token = get_access_token(account_id).get('access_token')
+        product_id = payload.get("product_id")
+        account_id = payload.get("account_id")
+
+        token = get_access_token(account_id).get("access_token")
         product_data = get_data_for_meli(product_id)
+        meli_id = product_data.get("meli_id")
 
-        meli_id = product_data.get('meli_id')
-        iternal_code = product_data.get('iternal_code')
-        folder_url = product_data.get('drive_url')        
+        if not meli_id:
+            logger.info(f"Product {product_id} is not published on MeLi, nothing to do.")
+            return "Product not published on MeLi", 200
 
-        folder_id = extract_id_from_url(folder_url)
-        if not folder_id:
-            logger.error(f"Could not extract ID from URL: {folder_url}")
-            return "Invalid Folder URL", 400
-        
-        # 2. Get Drive Service
-        drive_creds = get_drive_creds_from_secret()
-        drive_service = build('drive', 'v3', credentials=drive_creds)
-
-
-        # 4. Get MeLi Images
-        url = f"https://api.mercadolibre.com/items/{meli_id}"
-        headers = {'Authorization' : f'Bearer {token}'}
-        resp = requests.get(url, headers=headers).json()
-        pictures = resp.get('pictures', [])
+        # 1. Get the pictures from MeLi (capped at MAX_PICTURES)
+        resp = requests.get(
+            f"https://api.mercadolibre.com/items/{meli_id}",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        pictures = resp.json().get("pictures", [])[:MAX_PICTURES]
 
         if not pictures:
             logger.info(f"No images found for MeLi item {meli_id}")
             return "No images found", 200
 
+        # 2. Remove previous images and upload the new ones to GCS
+        client = storage.Client()  # uses the Cloud Function's service account
+        bucket = client.bucket(BUCKET_NAME)
+        prefix = f"{product_id}/"
 
-        query = f"'{folder_id}' in parents and trashed = false"
-        results = drive_service.files().list(
-            q=query,
-            fields="nextPageToken, files(id, name)",
-            supportsAllDrives=True,
-            includeItemsFromAllDrives=True
-        ).execute()
+        for old_blob in bucket.list_blobs(prefix=prefix):
+            old_blob.delete()
 
-        items = results.get('files', [])
+        urls = []
+        for idx, pic in enumerate(pictures, start=1):
+            img_url = pic.get("secure_url") or pic.get("url")
+            png_buffer = _download_as_png(img_url)
 
-        if not items:
-            logger.info('No files found in the folder.')
-        else:
-            for item in items:
-                logger.info(f"Trashing file: {item['name']} (ID: {item['id']})")
-                drive_service.files().update(
-                    fileId=item['id'],
-                    body={'trashed': True},
-                    supportsAllDrives=True
-                ).execute()
+            blob = bucket.blob(f"{prefix}{idx}.png")
+            blob.upload_from_file(png_buffer, content_type="image/png")
+            urls.append(blob.public_url)
+            logger.info(f"Uploaded gs://{BUCKET_NAME}/{blob.name}")
 
-
-        # 5. Process and Upload Images
-        for idx, pic in enumerate(pictures):
-            img_url = pic.get('secure_url')
-            img_resp = requests.get(img_url)
-            
-            if img_resp.status_code == 200:
-                with Image.open(io.BytesIO(img_resp.content)) as img:
-                    # Convert to PNG in memory
-                    png_buffer = io.BytesIO()
-                    img.save(png_buffer, format='PNG')
-                    png_buffer.seek(0)
-
-                    file_meta = {
-                        'name': f"{iternal_code}_{idx}.png", 
-                        'parents': [folder_id]
-                    }
-                    media = MediaIoBaseUpload(png_buffer, mimetype='image/png')
-                    
-                    drive_service.files().create(
-                        body=file_meta, 
-                        media_body=media,
-                        supportsAllDrives=True
-                    ).execute()
-                    
-                    logger.info(f"Uploaded image {idx} to Drive folder {folder_id}")
+        # 3. Save the public URLs in the DB
+        _save_product_images(product_id, urls)
 
         return "Success", 200
 

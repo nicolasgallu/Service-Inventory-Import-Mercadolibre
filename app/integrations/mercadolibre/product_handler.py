@@ -113,18 +113,13 @@ def _aux_product_format(item_data):
     """"""
     logger.info("Creating Product Schema for Mercadolibre.")
 
-    internal_code = item_data['internal_code']
-    ##PROBLEMA, SI AHORA PRODUCT ID ES EL ID DE LA TABLA LA RELACION CON FOLDER ROMPE.
-    ##TEMPORALMENTE LO VAMOS A DEJAR COMO internal_code, PARA NO ROMPER CON LA RELACION. (pero puede traer problemas si los id se repiten entre distintas cuentas.)
-    #public_images = process_images_storage(internal_code) 
-    
     public_images=[]
-    
+        
     if public_images == []:
         logger.info("Without images in Folder, using images from DB.")
         product_id = item_data['id']
         public_images = get_product_images(product_id)
-        public_images = [{'source': image["url"]} for image in public_images]
+        public_images = [{'source': image["url"]} for image in public_images[:5]]
 
 
     product_name = item_data["name_edited"] or item_data["name"]

@@ -8,5 +8,6 @@ Unidecode==1.4.0
 pillow==12.2.0
 google-cloud-secret-manager==2.26.0
 google-api-python-client==2.188.0
+google-cloud-storage==3.6.0
 google-auth==2.47.0
 gunicorn==21.2.0
