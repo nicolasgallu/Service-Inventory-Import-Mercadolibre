@@ -196,7 +196,7 @@ def aux_format_data(product_id):
         logger.info("Without images in Folder, using images from DB.")
         product_id = data['id']
         public_images = get_product_images(product_id)
-        public_images = [{'src': image["url"]} for image in public_images[:5]
+        public_images = [{'src': image["url"]} for image in public_images[:5]]
 
     else:
         for i in public_images:
