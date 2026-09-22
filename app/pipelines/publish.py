@@ -17,14 +17,12 @@ def pipeline_publish(payload):
         asyncio.run(ai_call_prepublish(payload))
         if target == "mercadolibre":
             prepublish(payload)
-            calculate_cost(payload)
         elif target == "tiendanube":
             create_categories(payload)
 
     elif event_type == 'publish':
         if target == "mercadolibre":
             meli_publish(payload)
-            calculate_cost(payload)
         elif target == "tiendanube":
             tnube_publish(payload)
 

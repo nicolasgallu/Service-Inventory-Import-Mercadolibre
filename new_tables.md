@@ -249,6 +249,22 @@ CREATE TABLE mercadolibre.selling_costs (
 ```
 
 ```sql
+  CREATE TABLE mercadolibre.performance (    
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  product_listing_id INT NOT NULL,
+  entity_type varchar(50) DEFAULT NULL,
+  score tinyint DEFAULT NULL,
+  level varchar(50) DEFAULT NULL,
+  level_wording varchar(50) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  buckets json DEFAULT NULL,
+  FOREIGN KEY (product_listing_id) REFERENCES mercadolibre.product_listings(id) ON DELETE CASCADE,
+  UNIQUE KEY uq_performance_listing (product_listing_id)
+)
+```
+
+```sql
 CREATE TABLE mercadolibre.variation_listings (
     id INT PRIMARY KEY AUTO_INCREMENT,
     product_variation_id INT NOT NULL,

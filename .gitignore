@@ -15,3 +15,4 @@ db_helper/
 insert_db.py
 setup_db.py
 new_tables.md
+/migration

@@ -251,7 +251,7 @@ def _generate_category_options(attrb_id, prod_id, product_names, token):
 
 
 def _settings_builder(attribute_id, category_id, price, token):
-    """Return all required attributes giving the category"""
+    """Return all required attributes by the category."""
 
     logger.info("Running Settings Builder")
     HEADER = {"Authorization": f"Bearer {token}"}    
@@ -386,17 +386,12 @@ def prepublish(payload):
     price = product_data["price_meli"] or product_data["price"]
     category_options = product_data['category_options']
     category_id = product_data['category_id']
-    settings = product_data['settings']
     attribute_id = product_data['attribute_id']
-
-    if settings:
-        settings = json.loads(settings)
-        settings_error_check = [i for i in settings][0].get('Error', False)
 
     if category_options is None or category_options=='[]':
         _generate_category_options(attribute_id, product_id, product_names, token)
 
-    elif category_id is not None and (settings is None or settings_error_check):
+    elif category_id is not None:
         _settings_builder(attribute_id, category_id, price, token)
     
     elif category_id is None and category_options is not None:
